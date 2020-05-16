@@ -11,48 +11,7 @@ from xbrl_parser import *
 
 
 # TODO: 特定の項目を要素名指定で取得する方法では、会社ごとの定義の違いにより取得できないケースがある。
-# どの会社でも売上を取得できるよう、タクソノミの仕様に沿った方法を調べる
-
-def get_tgt_data(model_xbrl, yuho_cols, is_consolidated, has_consolidated):
-    """有価証券報告書から取得対象の項目を取得する"""
-
-    ser_yuho = pd.Series([None for i in range(
-        len(yuho_cols))], dtype="object", index=yuho_cols)
-    ser_yuho[CONSOLIDATED_OR_NONCONSOLIDATED_COL] = "連結" if is_consolidated else "個別"
-    ser_yuho[HAS_CONSOLIDATED_ELM_NAME] = has_consolidated
-    # 【忘備】: 有価証券報告書xbrlから必要情報抽出（総なめしない）
-    # 1. ModelXbrlクラスのfactsByQname属性（辞書型）に すべてのfactが格納されている
-    # 2. 1のキーはQnameクラスオブジェクト。Prefix:要素名の文字列からQname型オブジェクトを作成するために、ModelValue.py の qname関数を使用
-    # 3. 2のvalue指定に名前空間uriが必要。ModelXbrlクラスのprefixedNamespaces属性（辞書型）から取得。
-    for qname_prefix, localnames in YUHO_COLS_DICT.items():
-        print("qname_prefix: ", qname_prefix)
-        ns = model_xbrl.prefixedNamespaces[qname_prefix]
-        for localname in localnames:
-            facts = model_xbrl.factsByQname[ModelValue.qname(
-                ns, name=f"{qname_prefix}:{localname}")]
-            if not facts:
-                ser_yuho[localname] = None
-            elif qname_prefix == "jpdei_cor":
-                ser_yuho[localname] = list(facts)[0].value
-            elif qname_prefix == "jppfs_cor":
-                for fact in facts:
-                    if fact.context.isStartEndPeriod:
-                        # 期間型勘定科目
-                        tgt_contextid = "CurrentYearDuration" if is_consolidated \
-                            else "CurrentYearDuration_NonConsolidatedMember"
-                    elif fact.context.isInstantPeriod:
-                        # 時点型勘定科目
-                        tgt_contextid = "CurrentYearInstant" if is_consolidated \
-                            else "CurrentYearInstant_NonConsolidatedMember"
-                    else:
-                        continue
-                    if fact.contextID == tgt_contextid:
-                        ser_yuho[localname] = fact.value
-                        ser_yuho[f"{fact.localName}_unitid"] = fact.unitID
-                        break
-
-    return ser_yuho
-
+# 学習対象として、どの会社でも「売上」を取得できるよう、タクソノミの仕様に沿った方法を調べる
 
 def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
     """有価証券報告書の対象項目を取得し、会社情報を追加する"""
@@ -73,6 +32,8 @@ def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
         model_manager = ModelManager.initialize(ctrl)
         print("model_manager.defaultLang: ", model_manager.defaultLang)
         model_xbrl = model_manager.load(xbrl_file)
+
+        # ★★テスト中
         print(dir(model_xbrl))
         print()
         #print("arcroleTypes: ", model_xbrl.arcroleTypes)
@@ -100,9 +61,10 @@ def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
             if nCon_key=="NetSales":
                print(f"{nCon_key}: ", nCon_val)
 
-        # ★★テスト中
         import sys
         sys.exit()
+        # ★★ここまで
+
         # 連結財務諸表ありかどうか
         ns = model_xbrl.prefixedNamespaces["jpdei_cor"]
         facts_has_consolidated = model_xbrl.factsByQname[ModelValue.qname(
@@ -120,7 +82,7 @@ def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
         if has_consolidated:
             is_consolidated_list.append(True)
         for is_consolidated in is_consolidated_list:
-            ser_yuho = get_tgt_data(
+            ser_yuho = xbrl_parser.get_tgt_data(
                 model_xbrl, yuho_cols, is_consolidated, has_consolidated)
             ser_yuho.name = df_row
             df_yuho = df_yuho.append(ser_yuho)
