@@ -5,8 +5,9 @@ import zipfile
 
 import pandas as pd
 
-from arelle import Cntlr, ModelManager, ModelValue
-from edinetcd_info import get_edinetcd_info, EDINETCD_COL
+from arelle import Cntlr, ModelManager
+from arelle.ModelValue import qname
+from edinetcd_info import EDINETCD_COL, get_edinetcd_info
 
 EDINET_ROOT_DIR = "D:\\EDINET\\test"
 EDINET_XBRL_REGREX = "*\\XBRL\\PublicDoc\\*.xbrl"
@@ -100,7 +101,7 @@ def get_tgt_data(model_xbrl, yuho_cols, is_consolidated, has_consolidated):
         print("qname_prefix: ", qname_prefix)
         ns = model_xbrl.prefixedNamespaces[qname_prefix]
         for localname in localnames:
-            facts = model_xbrl.factsByQname[ModelValue.qname(
+            facts = model_xbrl.factsByQname[qname(
                 ns, name=f"{qname_prefix}:{localname}")]
             if not facts:
                 ser_yuho[localname] = None
@@ -157,7 +158,7 @@ def get_yuho_data(xbrl_files, df_edinetcd_info):
         model_xbrl = model_manager.load(xbrl_file)
         # 連結財務諸表ありかどうか
         ns = model_xbrl.prefixedNamespaces["jpdei_cor"]
-        facts_has_consolidated = model_xbrl.factsByQname[ModelValue.qname(
+        facts_has_consolidated = model_xbrl.factsByQname[qname(
             ns, name=f"jpdei_cor:{HAS_CONSOLIDATED_ELM_NAME}")]
         if list(facts_has_consolidated)[0].value == "true":
             has_consolidated = True
