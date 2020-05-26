@@ -38,7 +38,6 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
     rel_from_tgt_list = pc_rel_set.fromModelObject(
         model_xbrl.qnameConcepts.get(qname_from))
     mo = model_xbrl.qnameConcepts.get(qname_from)
-    sys.exit()
 
     for rel_from_tgt in rel_from_tgt_list:
         print()
