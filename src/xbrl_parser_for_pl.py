@@ -11,6 +11,8 @@ from arelle.ModelValue import qname
 from edinetcd_info import EDINETCD_COL, get_edinetcd_info
 from xbrl_parser import *
 
+
+IS_TEST = True
 YUHO_COLS_DICT = {
     "jpdei_cor": {
         HAS_CONSOLIDATED_ELM_NAME: "連結決算の有無",
@@ -33,25 +35,23 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
 
     # 損益計算書LineItemsを親とする表示リレーションシップを抽出
     qname_from = qname(ns, name=f"{qname_prefix}:StatementOfIncomeLineItems")
-    rel_from_tgt_list = pc_rel_set.fromModelObject(model_xbrl.qnameConcepts.get(qname_from))
+    rel_from_tgt_list = pc_rel_set.fromModelObject(
+        model_xbrl.qnameConcepts.get(qname_from))
     mo = model_xbrl.qnameConcepts.get(qname_from)
-    print("★★★dir(mo): ", dir(mo))
-    print("mo.facets; ", mo.facets)
     sys.exit()
 
     for rel_from_tgt in rel_from_tgt_list:
         print()
         mcpt_to = rel_from_tgt.toModelObject
         print("modelConcept_to: ", mcpt_to)
-        #-> modelConcept_to:  modelConcept[5284, qname: jppfs_cor:NetSales, type: xbrli:monetaryItemType, abstract: false, jppfs_cor_2018-03-31.xsd, line 251]
-        
+        # -> modelConcept_to:  modelConcept[5284, qname: jppfs_cor:NetSales, type: xbrli:monetaryItemType, abstract: false, jppfs_cor_2018-03-31.xsd, line 251]
+
         # abstract == True の場合、タイトル項目なので金額情報なし。その表示子要素の内、合計金額を表す要素のfactを取得する
         # 【備考】：以下の処理を行う
         # 1. タイトル項目をfrom(親)とする表示リレーションシップを取得
         # 2. 1のリレーションシップのto(子)のModelObjectを取得
         # 3. 2の子達をfrom(親)とする計算リレーションシップを確認　→　1つがfrom(親=算出結果)、他がto(子=親の算出に使われる要素)
         # 4. 3で得たfrom(親)のfactを取得する
-        #if mcpt_to.abstract == "true": ★★あとで削除
         if mcpt_to.isAbstract():
             pc_rels_from_tgt = pc_rel_set.fromModelObject(mcpt_to)
             if len(pc_rels_from_tgt) == 1:
@@ -62,7 +62,8 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
                 mcpt_to_its_children.append(pc_rel.toModelObject)
             mcpt_to_tmp = None
             for mcpt_to_its_child in mcpt_to_its_children:
-                cal_rels_children = cal_rel_set.fromModelObject(mcpt_to_its_child)
+                cal_rels_children = cal_rel_set.fromModelObject(
+                    mcpt_to_its_child)
                 if len(cal_rels_children) == len(pc_rels_from_tgt) - 1:
                     mc_children = set()
                     for cal_rel in cal_rels_children:
@@ -74,13 +75,14 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
                 print("【想定外】勘定科目_abstractの子達の計算関係にfrom(親)が存在しません。")
                 sys.exit()
             mcpt_to = mcpt_to_tmp
-        
+
         # fact を取得
         # 【注意】EDINETバリデーションガイド: EC8024E
         # 1つの要素に対し、対象期間（または時点）・ユニットの異なる複数のfactが存在し得る
         # 以下は当年度かつユニットが日本円のfactを取得する
         localname = mcpt_to.qname.localName
-        facts = model_xbrl.factsByQname[qname(ns, name=f"{qname_prefix}:{localname}")]
+        facts = model_xbrl.factsByQname[qname(
+            ns, name=f"{qname_prefix}:{localname}")]
         for fact in facts:
             # 【備考】EDINETタクソノミの設定規約書：コンテキストIDの命名規約
             # 当期のfactの対象期間（または時点）は "CurrentYear"で始まる
@@ -107,7 +109,8 @@ def get_facts(model_xbrl, is_consolidated, has_consolidated):
         ns = model_xbrl.prefixedNamespaces[qname_prefix]
         if qname_prefix == "jpdei_cor":
             for localname in localnames:
-                facts = model_xbrl.factsByQname[qname(ns, name=f"{qname_prefix}:{localname}")]
+                facts = model_xbrl.factsByQname[qname(
+                    ns, name=f"{qname_prefix}:{localname}")]
                 if not facts:
                     dict_facts[localname] = None
                 elif qname_prefix == "jpdei_cor":
@@ -116,7 +119,8 @@ def get_facts(model_xbrl, is_consolidated, has_consolidated):
             # 表示、計算の親子関係を表すリレーションシップを取得
             pc_rel_set = model_xbrl.relationshipSet(XbrlConst.parentChild)
             cal_rel_set = model_xbrl.relationshipSet(XbrlConst.summationItem)
-            dict_facts = get_pl_facts(model_xbrl, dict_facts, ns, qname_prefix, pc_rel_set, cal_rel_set)
+            dict_facts = get_pl_facts(
+                model_xbrl, dict_facts, ns, qname_prefix, pc_rel_set, cal_rel_set)
         else:
             pass
     return dict_facts
@@ -125,14 +129,6 @@ def get_facts(model_xbrl, is_consolidated, has_consolidated):
 def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
     """有価証券報告書の対象項目を取得し、会社情報を追加する"""
 
-    # 格納用のデータフレームを用意
-    #yuho_cols = [CONSOLIDATED_OR_NONCONSOLIDATED_COL]
-    #for key_level1, vals_level1 in YUHO_COLS_DICT.items():
-    #    for key in vals_level1.keys():
-    #        yuho_cols.append(key)
-    #        if key_level1 == "jppfs_cor":
-    #            yuho_cols.append(f"{key}_unitid")
-    #df_yuho = pd.DataFrame([], columns=yuho_cols)
     list_dict_facts = []
     # 有価証券報告書から対象項目を取得
     for index, xbrl_file in enumerate(xbrl_files):
@@ -140,7 +136,6 @@ def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
         ctrl = Cntlr.Cntlr()
         model_manager = ModelManager.initialize(ctrl)
         model_xbrl = model_manager.load(xbrl_file)
-        #print("dir(model_xbrl): ", dir(model_xbrl))
         # 連結財務諸表ありかどうか
         ns = model_xbrl.prefixedNamespaces["jpdei_cor"]
         facts_has_consolidated = model_xbrl.factsByQname[qname(
@@ -158,7 +153,8 @@ def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
         if has_consolidated:
             is_consolidated_list.append(True)
         for is_consolidated in is_consolidated_list:
-            dict_facts = get_facts(model_xbrl, is_consolidated, has_consolidated)
+            dict_facts = get_facts(
+                model_xbrl, is_consolidated, has_consolidated)
             list_dict_facts.append(dict_facts)
     # 固定列のカラム名を日本語に変換
     yuho_cols_rep = {
@@ -177,10 +173,11 @@ def main():
     # EDINETコードリストから企業情報を取得
     df_edinetcd_info = get_edinetcd_info(EDINETCDDLINFO_COLS)
     # EDINETからダウンロードしたZIPファイルから必要なファイルを抽出
-    '''★★テストのため無効中
-    edinet_zip_dir = os.path.join(EDINET_ROOT_DIR, "zip")
-    xbrl_parser.extract_files_from_zip(edinet_zip_dir)
-    '''
+    if IS_TEST:
+        pass
+    else:
+        edinet_zip_dir = os.path.join(EDINET_ROOT_DIR, "zip")
+        xbrl_parser.extract_files_from_zip(edinet_zip_dir)
     xbrl_file_regrex = os.path.join(EDINET_ROOT_DIR, EDINET_XBRL_REGREX)
     xbrl_files = glob.glob(xbrl_file_regrex)
     # 有価証券報告書の情報を取得する
