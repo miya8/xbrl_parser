@@ -11,8 +11,12 @@ from arelle.ModelValue import qname
 from edinetcd_info import EDINETCD_COL, get_edinetcd_info
 from xbrl_parser import *
 
-
+# 動作確認
 IS_TEST = True
+
+# キー: 名前空間名、値: ローカル名
+# "jpdei_cor"（会社・書類情報）: 以下に記載した項目は登録必須のためqname指定で取得する
+# "jppfs_cor"（財務諸表本表）: 企業ごとに項目が異なるため、リンクベースに沿って情報を取得する
 YUHO_COLS_DICT = {
     "jpdei_cor": {
         HAS_CONSOLIDATED_ELM_NAME: "連結決算の有無",
@@ -37,12 +41,43 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
     qname_from = qname(ns, name=f"{qname_prefix}:StatementOfIncomeLineItems")
     rel_from_tgt_list = pc_rel_set.fromModelObject(
         model_xbrl.qnameConcepts.get(qname_from))
-    mo = model_xbrl.qnameConcepts.get(qname_from)
+    #mo = model_xbrl.qnameConcepts.get(qname_from)
 
     for rel_from_tgt in rel_from_tgt_list:
         print()
         mcpt_to = rel_from_tgt.toModelObject
         print("modelConcept_to: ", mcpt_to)
+
+        # ★★
+        print()
+        from_modelobj = rel_from_tgt.fromModelObject
+        print("from_modelobj: ", from_modelobj)
+        print()
+        print("dir(from_modelobj): ", dir(from_modelobj))
+        print()
+        print("from_modelobj.isDomainMember: ", from_modelobj.isDomainMember)
+        print("from_modelobj.isExplicitDimension: ", from_modelobj.isExplicitDimension)
+        print()
+        print("from_modelobj.isTypedDimension: ", from_modelobj.isTypedDimension)
+        print()
+
+        rel_parent = pc_rel_set.toModelObject(from_modelobj)
+        print("rel_parent: ", rel_parent)
+        for rel in rel_parent:
+            models = rel.fromModelObject
+            for model in models:
+                print("model: ", model)
+                print()
+                print("dir(model): ", dir(model))
+                print()
+                print("model.isDomainMember: ", model.isDomainMember)
+                print("model.isExplicitDimension: ", model.isExplicitDimension)
+                print()
+                print("model.isTypedDimension: ", model.isTypedDimension)
+                print()
+
+
+        sys.exit()
         # -> modelConcept_to:  modelConcept[5284, qname: jppfs_cor:NetSales, type: xbrli:monetaryItemType, abstract: false, jppfs_cor_2018-03-31.xsd, line 251]
 
         # abstract == True の場合、タイトル項目なので金額情報なし。その表示子要素の内、合計金額を表す要素のfactを取得する
@@ -51,7 +86,7 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
         # 2. 1のリレーションシップのto(子)のModelObjectを取得
         # 3. 2の子達をfrom(親)とする計算リレーションシップを確認　→　1つがfrom(親=算出結果)、他がto(子=親の算出に使われる要素)
         # 4. 3で得たfrom(親)のfactを取得する
-        if mcpt_to.isAbstract():
+        if mcpt_to.isAbstract:
             pc_rels_from_tgt = pc_rel_set.fromModelObject(mcpt_to)
             if len(pc_rels_from_tgt) == 1:
                 print(f"【想定外】勘定科目_abstract の子が1件のみ　 Qname: {mcpt_to.qname}")
@@ -134,7 +169,10 @@ def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
         print(xbrl_file, ":", index + 1, "/", len(xbrl_files))
         ctrl = Cntlr.Cntlr()
         model_manager = ModelManager.initialize(ctrl)
+        # ★★
         model_xbrl = model_manager.load(xbrl_file)
+        print("dir(model_xbrl): ", dir(model_xbrl))
+        #sys.exit()
         # 連結財務諸表ありかどうか
         ns = model_xbrl.prefixedNamespaces["jpdei_cor"]
         facts_has_consolidated = model_xbrl.factsByQname[qname(
