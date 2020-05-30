@@ -31,7 +31,7 @@ YUHO_COLS_DICT = {
 }
 
 
-def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_set):
+def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_set, dim_rel_set):
     """
     損益計算書LineItemsをfrom(親)とする表示リレーションシップのto(子)となる各ModelConceptのfactの値を取得する
     但しto(子)が抽象項目の場合は、更にそのto(子)達の内、集計結果を表すModelConceptのfactの値を取得する
@@ -43,41 +43,12 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
         model_xbrl.qnameConcepts.get(qname_from))
     #mo = model_xbrl.qnameConcepts.get(qname_from)
 
+    # TODO: Dimension関係リンクdim_rel_setを使用して連結、連結／個別を分ける
+    # 実施後、get_yuho_data_with_link関数のis_consolidated_listの処理削除
     for rel_from_tgt in rel_from_tgt_list:
         print()
         mcpt_to = rel_from_tgt.toModelObject
         print("modelConcept_to: ", mcpt_to)
-
-        # ★★
-        print()
-        from_modelobj = rel_from_tgt.fromModelObject
-        print("from_modelobj: ", from_modelobj)
-        print()
-        print("dir(from_modelobj): ", dir(from_modelobj))
-        print()
-        print("from_modelobj.isDomainMember: ", from_modelobj.isDomainMember)
-        print("from_modelobj.isExplicitDimension: ", from_modelobj.isExplicitDimension)
-        print()
-        print("from_modelobj.isTypedDimension: ", from_modelobj.isTypedDimension)
-        print()
-
-        rel_parent = pc_rel_set.toModelObject(from_modelobj)
-        print("rel_parent: ", rel_parent)
-        for rel in rel_parent:
-            models = rel.fromModelObject
-            for model in models:
-                print("model: ", model)
-                print()
-                print("dir(model): ", dir(model))
-                print()
-                print("model.isDomainMember: ", model.isDomainMember)
-                print("model.isExplicitDimension: ", model.isExplicitDimension)
-                print()
-                print("model.isTypedDimension: ", model.isTypedDimension)
-                print()
-
-
-        sys.exit()
         # -> modelConcept_to:  modelConcept[5284, qname: jppfs_cor:NetSales, type: xbrli:monetaryItemType, abstract: false, jppfs_cor_2018-03-31.xsd, line 251]
 
         # abstract == True の場合、タイトル項目なので金額情報なし。その表示子要素の内、合計金額を表す要素のfactを取得する
@@ -153,8 +124,9 @@ def get_facts(model_xbrl, is_consolidated, has_consolidated):
             # 表示、計算の親子関係を表すリレーションシップを取得
             pc_rel_set = model_xbrl.relationshipSet(XbrlConst.parentChild)
             cal_rel_set = model_xbrl.relationshipSet(XbrlConst.summationItem)
+            dim_rel_set = model_xbrl.relationshipSet(XbrlConst.domainMember)
             dict_facts = get_pl_facts(
-                model_xbrl, dict_facts, ns, qname_prefix, pc_rel_set, cal_rel_set)
+                model_xbrl, dict_facts, ns, qname_prefix, pc_rel_set, cal_rel_set, dim_rel_set)
         else:
             pass
     return dict_facts
