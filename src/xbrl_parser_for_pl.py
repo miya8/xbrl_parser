@@ -41,7 +41,38 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
     qname_from = qname(ns, name=f"{qname_prefix}:StatementOfIncomeLineItems")
     rel_from_tgt_list = pc_rel_set.fromModelObject(
         model_xbrl.qnameConcepts.get(qname_from))
-    #mo = model_xbrl.qnameConcepts.get(qname_from)
+    # ★★テスト★★
+    pc_rel_to_tgt_list = pc_rel_set.toModelObject(
+        model_xbrl.qnameConcepts.get(qname_from))
+    for rel in pc_rel_to_tgt_list:
+        print("pc_rel_to_tgt_list: ", rel)
+        print()
+    dim_rel_to_tgt_list = dim_rel_set.toModelObject(
+        model_xbrl.qnameConcepts.get(qname_from))
+    
+    for rel in dim_rel_to_tgt_list:
+        print("dim_rel_to_tgt_list: ", rel)
+        #print(dir(rel))
+        #print("rel.namespaceURI: ", rel.namespaceURI)
+        #print("rel.fromLabel: ", rel.fromLabel)
+        #print("rel.toLabel: ", rel.toLabel)
+        #print("rel.fromLocator: ", rel.fromLocator)
+        #print("rel.toLocator: ", rel.toLocator)
+        #print("rel.linkrole: ", rel.linkrole)
+        #print("type(rel.linkrole): ", type(rel.linkrole))
+        #sys.exit()
+    
+    # ★★テストここまで★★
+
+    '''
+    ここ使わないが、残したい
+    # 【備考】非連結または個別のfactを取得
+    # ただし、連結には連結／非連結軸がscenarioに設定されず、以下の処理では取得されない
+    # （報告書インスタンス作成ガイドライン：5-4-1 コンテキストIDの命名規約 より）
+    facts_by_dim = model_xbrl.factsByDimMemQname(
+            qname(model_xbrl.prefixedNamespaces["jppfs_cor"], name="jppfs_cor:ConsolidatedOrNonConsolidatedAxis")
+    )
+    '''
 
     # TODO: Dimension関係リンクdim_rel_setを使用して連結、連結／個別を分ける
     # 実施後、get_yuho_data_with_link関数のis_consolidated_listの処理削除
@@ -55,7 +86,7 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
         # 【備考】：以下の処理を行う
         # 1. タイトル項目をfrom(親)とする表示リレーションシップを取得
         # 2. 1のリレーションシップのto(子)のModelObjectを取得
-        # 3. 2の子達をfrom(親)とする計算リレーションシップを確認　→　1つがfrom(親=算出結果)、他がto(子=親の算出に使われる要素)
+        # 3. 2の子達をfrom(親)とする計算リレーションシップを取得して確認　:　1つがfrom(親=算出結果)、他がto(子=親の算出に使われる要素)
         # 4. 3で得たfrom(親)のfactを取得する
         if mcpt_to.isAbstract:
             pc_rels_from_tgt = pc_rel_set.fromModelObject(mcpt_to)
@@ -73,7 +104,9 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
                     mc_children = set()
                     for cal_rel in cal_rels_children:
                         mc_children.add(cal_rel.toModelObject)
-                    if mc_children == set(mcpt_to_its_children):
+                    set_mcpt_to_its_children = set(mcpt_to_its_children)
+                    set_mcpt_to_its_children.remove(mcpt_to_its_child)
+                    if mc_children == set_mcpt_to_its_children:
                         mcpt_to_tmp = mcpt_to_its_child
                         break
             if mcpt_to_tmp is None:
@@ -82,15 +115,16 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
             mcpt_to = mcpt_to_tmp
 
         # fact を取得
-        # 【注意】EDINETバリデーションガイド: EC8024E
-        # 1つの要素に対し、対象期間（または時点）・ユニットの異なる複数のfactが存在し得る
+        # 【注意】1つの要素に対し、コンテキスト・ユニットの異なる複数のfactが存在し得る
         # 以下は当年度かつユニットが日本円のfactを取得する
         localname = mcpt_to.qname.localName
         facts = model_xbrl.factsByQname[qname(
             ns, name=f"{qname_prefix}:{localname}")]
         for fact in facts:
-            # 【備考】EDINETタクソノミの設定規約書：コンテキストIDの命名規約
+            # 【備考】報告書インスタンス作成ガイドライン：5-4-1 コンテキストIDの命名規約
             # 当期のfactの対象期間（または時点）は "CurrentYear"で始まる
+            # TODO: CurrentYearだけではNG.
+            # コンテキストIDの命名規約を再度参照して修正する
             if (fact.contextID.startswith("CurrentYear")) and (fact.unitID == "JPY"):
                 print("localname: ", localname)
                 dict_yuho[localname] = fact.value
@@ -104,6 +138,11 @@ def get_facts(model_xbrl, is_consolidated, has_consolidated):
     dict_facts = {}
     dict_facts[CONSOLIDATED_OR_NONCONSOLIDATED_COL] = "連結" if is_consolidated else "個別"
     dict_facts[HAS_CONSOLIDATED_ELM_NAME] = has_consolidated
+    # リレーションシップを取得する際に指定するlinkrole
+    if is_consolidated:
+        link_role = "http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_StatementOfIncome"
+    else:
+        link_role = "http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_ConsolidatedStatementOfIncome"
     # 【備考】: 有価証券報告書xbrlから必要情報抽出（総なめしない）
     # 1. ModelXbrlクラスのfactsByQname属性（辞書型）に すべてのfactが格納されている
     # 2. 1のキーはQnameクラスオブジェクト。Prefix:要素名の文字列から
@@ -122,9 +161,10 @@ def get_facts(model_xbrl, is_consolidated, has_consolidated):
                     dict_facts[localname] = list(facts)[0].value
         elif qname_prefix == "jppfs_cor":
             # 表示、計算の親子関係を表すリレーションシップを取得
-            pc_rel_set = model_xbrl.relationshipSet(XbrlConst.parentChild)
-            cal_rel_set = model_xbrl.relationshipSet(XbrlConst.summationItem)
-            dim_rel_set = model_xbrl.relationshipSet(XbrlConst.domainMember)
+            # linkrole=で対象のリンクロールに絞り込み
+            pc_rel_set = model_xbrl.relationshipSet(XbrlConst.parentChild, linkrole=link_role)
+            cal_rel_set = model_xbrl.relationshipSet(XbrlConst.summationItem, linkrole=link_role)
+            dim_rel_set = model_xbrl.relationshipSet(XbrlConst.domainMember, linkrole=link_role)
             dict_facts = get_pl_facts(
                 model_xbrl, dict_facts, ns, qname_prefix, pc_rel_set, cal_rel_set, dim_rel_set)
         else:
@@ -144,7 +184,22 @@ def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
         # ★★
         model_xbrl = model_manager.load(xbrl_file)
         print("dir(model_xbrl): ", dir(model_xbrl))
-        #sys.exit()
+        print()
+        '''
+        print("model_xbrl.roleTypes.get(xlinkRole): ", model_xbrl.roleTypes.get("http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_ConsolidatedStatementOfIncome"))
+        print("model_xbrl.roleTypeDefinition: ", model_xbrl.roleTypeDefinition("http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_ConsolidatedStatementOfIncome"))
+        print("model_xbrl.roleTypeName: ", model_xbrl.roleTypeName("http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_ConsolidatedStatementOfIncome"))
+        print("model_xbrl.roleTypeName ja: ", model_xbrl.roleTypeName("http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_ConsolidatedStatementOfIncome", "ja"))
+        print("model_xbrl.qnameGroupDefinitions: ", model_xbrl.qnameGroupDefinitions)
+        print()
+        print('qname("jppfs_cor", "ConsolidatedOrNonConsolidatedAxis"): ', qname("jppfs_cor", "ConsolidatedOrNonConsolidatedAxis"))
+        print("model_xbrl.factsByDimMemQname: ", model_xbrl.factsByDimMemQname(
+            qname(model_xbrl.prefixedNamespaces["jppfs_cor"], name="jppfs_cor:ConsolidatedOrNonConsolidatedAxis"))
+        )
+        print()
+        sys.exit()
+        '''
+        # ★★ここまで
         # 連結財務諸表ありかどうか
         ns = model_xbrl.prefixedNamespaces["jpdei_cor"]
         facts_has_consolidated = model_xbrl.factsByQname[qname(
