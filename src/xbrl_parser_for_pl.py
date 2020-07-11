@@ -31,7 +31,7 @@ YUHO_COLS_DICT = {
 }
 
 
-def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_set, dim_rel_set):
+def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_set, dim_rel_set, is_consolidated):
     """
     損益計算書LineItemsをfrom(親)とする表示リレーションシップのto(子)となる各ModelConceptのfactの値を取得する
     但しto(子)が抽象項目の場合は、更にそのto(子)達の内、集計結果を表すModelConceptのfactの値を取得する
@@ -115,17 +115,23 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
             mcpt_to = mcpt_to_tmp
 
         # fact を取得
-        # 【注意】1つの要素に対し、コンテキスト・ユニットの異なる複数のfactが存在し得る
-        # 以下は当年度かつユニットが日本円のfactを取得する
+        # 【備考】1つの要素に対し、コンテキスト・ユニットの異なる複数のfactが存在し得る
+        # 当期のコンテキストIDは、報告書インスタンス作成ガイドライン：5-4-5 コンテキストの設定例より
+        # - 連結財務情報: 
+        #   - 当期連結時点 = CurrentYearInstant
+        #   - 当期連結期間 = CurrentYearDuration
+        # - 個別財務情報: 
+        #   - 当期個別時点 = CurrentYearInstant_NonConsolidatedMember
+        #   - 当期個別期間 = CurrentYearDuration_NonConsolidatedMember
+        contextid = f"CurrentYear{mcpt_to.periodType.capitalize()}"
+        if is_consolidated == False:
+            contextid += "_NonConsolidatedMember"
         localname = mcpt_to.qname.localName
         facts = model_xbrl.factsByQname[qname(
             ns, name=f"{qname_prefix}:{localname}")]
         for fact in facts:
-            # 【備考】報告書インスタンス作成ガイドライン：5-4-1 コンテキストIDの命名規約
-            # 当期のfactの対象期間（または時点）は "CurrentYear"で始まる
-            # TODO: CurrentYearだけではNG.
-            # コンテキストIDの命名規約を再度参照して修正する
-            if (fact.contextID.startswith("CurrentYear")) and (fact.unitID == "JPY"):
+            # 当年度の財務情報かつユニットが日本円のfactを取得する
+            if (fact.contextID == contextid) and (fact.unitID == "JPY"):
                 print("localname: ", localname)
                 dict_yuho[localname] = fact.value
                 break
@@ -156,8 +162,10 @@ def get_facts(model_xbrl, is_consolidated, has_consolidated):
                 facts = model_xbrl.factsByQname[qname(
                     ns, name=f"{qname_prefix}:{localname}")]
                 if not facts:
+                    # YUHO_COLS_DICT["jpdei_cor"]に設定した要素はEDINETの入力必須項目のため
+                    # ここは呼ばれないはず
                     dict_facts[localname] = None
-                elif qname_prefix == "jpdei_cor":
+                else:
                     dict_facts[localname] = list(facts)[0].value
         elif qname_prefix == "jppfs_cor":
             # 表示、計算の親子関係を表すリレーションシップを取得
@@ -166,7 +174,7 @@ def get_facts(model_xbrl, is_consolidated, has_consolidated):
             cal_rel_set = model_xbrl.relationshipSet(XbrlConst.summationItem, linkrole=link_role)
             dim_rel_set = model_xbrl.relationshipSet(XbrlConst.domainMember, linkrole=link_role)
             dict_facts = get_pl_facts(
-                model_xbrl, dict_facts, ns, qname_prefix, pc_rel_set, cal_rel_set, dim_rel_set)
+                model_xbrl, dict_facts, ns, qname_prefix, pc_rel_set, cal_rel_set, dim_rel_set, is_consolidated)
         else:
             pass
     return dict_facts
@@ -198,8 +206,9 @@ def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
         )
         print()
         sys.exit()
-        '''
         # ★★ここまで
+        '''        
+
         # 連結財務諸表ありかどうか
         ns = model_xbrl.prefixedNamespaces["jpdei_cor"]
         facts_has_consolidated = model_xbrl.factsByQname[qname(
@@ -211,7 +220,7 @@ def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
         else:
             print("連結決算の有無の項目の値が想定外です。")
             print(f"該当ファイル: {xbrl_file}")
-        # 個別財務諸表はデフォルトで取得
+        # 非連結または個別財務諸表はデフォルトで取得
         is_consolidated_list = [False]
         # 連結財務諸表ありの場合、追加
         if has_consolidated:
@@ -220,14 +229,17 @@ def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
             dict_facts = get_facts(
                 model_xbrl, is_consolidated, has_consolidated)
             list_dict_facts.append(dict_facts)
+
+    df_yuho = pd.DataFrame(list_dict_facts)
+    
     # 固定列のカラム名を日本語に変換
     yuho_cols_rep = {
         key: val
         for val_level1 in YUHO_COLS_DICT.values()
         for key, val in val_level1.items()
     }
-    df_yuho = pd.DataFrame()
     df_yuho.rename(columns=yuho_cols_rep, inplace=True)
+    
     # 企業情報をマージ
     df_yuho = df_yuho.merge(df_edinetcd_info, on=EDINETCD_COL, how="left")
     return df_yuho
