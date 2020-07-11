@@ -8,11 +8,19 @@ import pandas as pd
 
 from arelle import Cntlr, ModelManager, XbrlConst
 from arelle.ModelValue import qname
-from edinetcd_info import EDINETCD_COL, get_edinetcd_info
-from xbrl_parser import *
+from edinetcd_info import EDINETCD_COL, EDINETCDDLINFO_COLS, get_edinetcd_info
+from utils import extract_files_from_zip
 
 # 動作確認
 IS_TEST = True
+
+# パス関連
+EDINET_ROOT_DIR = "D:\\EDINET\\test"
+EDINET_XBRL_REGREX = "*\\XBRL\\PublicDoc\\*.xbrl"
+OUTPUT_FILE_NAME = "yuho.csv"
+
+# 連結有無を示す要素のローカル名
+HAS_CONSOLIDATED_ELM_NAME = "WhetherConsolidatedFinancialStatementsArePreparedDEI"
 
 # キー: 名前空間名、値: ローカル名
 # "jpdei_cor"（会社・書類情報）: 以下に記載した項目は登録必須のためqname指定で取得する
@@ -30,6 +38,8 @@ YUHO_COLS_DICT = {
     "jppfs_cor": {}
 }
 
+# アウトプットに追加する列
+CONSOLIDATED_OR_NONCONSOLIDATED_COL = "連結/個別"
 
 def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_set, dim_rel_set, is_consolidated):
     """
@@ -210,7 +220,7 @@ def main():
         pass
     else:
         edinet_zip_dir = os.path.join(EDINET_ROOT_DIR, "zip")
-        xbrl_parser.extract_files_from_zip(edinet_zip_dir)
+        extract_files_from_zip(edinet_zip_dir)
     xbrl_file_regrex = os.path.join(EDINET_ROOT_DIR, EDINET_XBRL_REGREX)
     xbrl_files = glob.glob(xbrl_file_regrex)
     # 有価証券報告書の情報を取得する
