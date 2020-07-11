@@ -74,8 +74,6 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
     )
     '''
 
-    # TODO: Dimension関係リンクdim_rel_setを使用して連結、連結／個別を分ける
-    # 実施後、get_yuho_data_with_link関数のis_consolidated_listの処理削除
     for rel_from_tgt in rel_from_tgt_list:
         print()
         mcpt_to = rel_from_tgt.toModelObject
