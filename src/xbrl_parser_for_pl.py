@@ -108,7 +108,7 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
             # 当年度の財務情報かつユニットが日本円のfactを取得する
             if (fact.contextID == contextid) and (fact.unitID == "JPY"):
                 print("localname: ", localname)
-                dict_yuho[localname] = fact.value
+                dict_yuho[mcpt_to.label()] = fact.value
                 break
     return dict_yuho
 
