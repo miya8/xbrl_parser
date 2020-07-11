@@ -41,31 +41,8 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
     qname_from = qname(ns, name=f"{qname_prefix}:StatementOfIncomeLineItems")
     rel_from_tgt_list = pc_rel_set.fromModelObject(
         model_xbrl.qnameConcepts.get(qname_from))
-    # ★★テスト★★
-    pc_rel_to_tgt_list = pc_rel_set.toModelObject(
-        model_xbrl.qnameConcepts.get(qname_from))
-    for rel in pc_rel_to_tgt_list:
-        print("pc_rel_to_tgt_list: ", rel)
-        print()
-    dim_rel_to_tgt_list = dim_rel_set.toModelObject(
-        model_xbrl.qnameConcepts.get(qname_from))
-    
-    for rel in dim_rel_to_tgt_list:
-        print("dim_rel_to_tgt_list: ", rel)
-        #print(dir(rel))
-        #print("rel.namespaceURI: ", rel.namespaceURI)
-        #print("rel.fromLabel: ", rel.fromLabel)
-        #print("rel.toLabel: ", rel.toLabel)
-        #print("rel.fromLocator: ", rel.fromLocator)
-        #print("rel.toLocator: ", rel.toLocator)
-        #print("rel.linkrole: ", rel.linkrole)
-        #print("type(rel.linkrole): ", type(rel.linkrole))
-        #sys.exit()
-    
-    # ★★テストここまで★★
-
     '''
-    ここ使わないが、残したい
+    TODO: ここ使わない。どっかに整理後削除。
     # 【備考】非連結または個別のfactを取得
     # ただし、連結には連結／非連結軸がscenarioに設定されず、以下の処理では取得されない
     # （報告書インスタンス作成ガイドライン：5-4-1 コンテキストIDの命名規約 より）
@@ -142,7 +119,7 @@ def get_facts(model_xbrl, is_consolidated, has_consolidated):
     dict_facts = {}
     dict_facts[CONSOLIDATED_OR_NONCONSOLIDATED_COL] = "連結" if is_consolidated else "個別"
     dict_facts[HAS_CONSOLIDATED_ELM_NAME] = has_consolidated
-    # リレーションシップを取得する際に指定するlinkrole
+    # リレーションシップの絞り込み用に指定するlinkrole
     if is_consolidated:
         link_role = "http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_ConsolidatedStatementOfIncome"
     else:
@@ -187,25 +164,7 @@ def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
         print(xbrl_file, ":", index + 1, "/", len(xbrl_files))
         ctrl = Cntlr.Cntlr()
         model_manager = ModelManager.initialize(ctrl)
-        # ★★
         model_xbrl = model_manager.load(xbrl_file)
-        print("dir(model_xbrl): ", dir(model_xbrl))
-        print()
-        '''
-        print("model_xbrl.roleTypes.get(xlinkRole): ", model_xbrl.roleTypes.get("http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_ConsolidatedStatementOfIncome"))
-        print("model_xbrl.roleTypeDefinition: ", model_xbrl.roleTypeDefinition("http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_ConsolidatedStatementOfIncome"))
-        print("model_xbrl.roleTypeName: ", model_xbrl.roleTypeName("http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_ConsolidatedStatementOfIncome"))
-        print("model_xbrl.roleTypeName ja: ", model_xbrl.roleTypeName("http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_ConsolidatedStatementOfIncome", "ja"))
-        print("model_xbrl.qnameGroupDefinitions: ", model_xbrl.qnameGroupDefinitions)
-        print()
-        print('qname("jppfs_cor", "ConsolidatedOrNonConsolidatedAxis"): ', qname("jppfs_cor", "ConsolidatedOrNonConsolidatedAxis"))
-        print("model_xbrl.factsByDimMemQname: ", model_xbrl.factsByDimMemQname(
-            qname(model_xbrl.prefixedNamespaces["jppfs_cor"], name="jppfs_cor:ConsolidatedOrNonConsolidatedAxis"))
-        )
-        print()
-        sys.exit()
-        # ★★ここまで
-        '''        
 
         # 連結財務諸表ありかどうか
         ns = model_xbrl.prefixedNamespaces["jpdei_cor"]
