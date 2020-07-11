@@ -144,9 +144,9 @@ def get_facts(model_xbrl, is_consolidated, has_consolidated):
     dict_facts[HAS_CONSOLIDATED_ELM_NAME] = has_consolidated
     # リレーションシップを取得する際に指定するlinkrole
     if is_consolidated:
-        link_role = "http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_StatementOfIncome"
-    else:
         link_role = "http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_ConsolidatedStatementOfIncome"
+    else:
+        link_role = "http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_StatementOfIncome"
     # 【備考】: 有価証券報告書xbrlから必要情報抽出（総なめしない）
     # 1. ModelXbrlクラスのfactsByQname属性（辞書型）に すべてのfactが格納されている
     # 2. 1のキーはQnameクラスオブジェクト。Prefix:要素名の文字列から
