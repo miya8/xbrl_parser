@@ -102,10 +102,10 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
         # fact を取得
         # 【備考】1つの要素に対し、コンテキスト・ユニットの異なる複数のfactが存在し得る
         # 当期のコンテキストIDは、報告書インスタンス作成ガイドライン：5-4-5 コンテキストの設定例より
-        # - 連結財務情報: 
+        # - 連結財務情報:
         #   - 当期連結時点 = CurrentYearInstant
         #   - 当期連結期間 = CurrentYearDuration
-        # - 個別財務情報: 
+        # - 個別財務情報:
         #   - 当期個別時点 = CurrentYearInstant_NonConsolidatedMember
         #   - 当期個別期間 = CurrentYearDuration_NonConsolidatedMember
         contextid = f"CurrentYear{mcpt_to.periodType.capitalize()}"
@@ -198,7 +198,7 @@ def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
             list_dict_facts.append(dict_facts)
 
     df_yuho = pd.DataFrame(list_dict_facts)
-    
+
     # 固定列のカラム名を日本語に変換
     yuho_cols_rep = {
         key: val
@@ -206,7 +206,7 @@ def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
         for key, val in val_level1.items()
     }
     df_yuho.rename(columns=yuho_cols_rep, inplace=True)
-    
+
     # 企業情報をマージ
     df_yuho = df_yuho.merge(df_edinetcd_info, on=EDINETCD_COL, how="left")
     return df_yuho
@@ -220,7 +220,13 @@ def main():
         pass
     else:
         edinet_zip_dir = os.path.join(EDINET_ROOT_DIR, "zip")
-        extract_files_from_zip(edinet_zip_dir)
+        extract_files_from_zip(
+            edinet_zip_dir,
+            dest_dir_root=EDINET_ROOT_DIR,
+            unzip_members_regrep="|".join(
+                [f"XBRL/PublicDoc/.*\.{extension}" for extension in ["xbrl", "xsd", "xml"]]
+            )
+        )
     xbrl_file_regrex = os.path.join(EDINET_ROOT_DIR, EDINET_XBRL_REGREX)
     xbrl_files = glob.glob(xbrl_file_regrex)
     # 有価証券報告書の情報を取得する
