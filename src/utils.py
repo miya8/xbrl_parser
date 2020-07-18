@@ -17,6 +17,8 @@ def extract_files_from_zip(zip_dir, tgt_zfile_names=None, dest_dir_root=None, de
         print(f"{zfile_name}: {index + 1} / {zip_file_num}")
         if dest_dirname is None:
             dest_last_dir = zfile_name
+        else:
+            dest_last_dir = dest_dirname
         if dest_dir_root is None:
             dest_dir_path = os.path.join(zip_dir, dest_last_dir)
         else:
