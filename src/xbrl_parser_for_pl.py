@@ -20,7 +20,8 @@ OUTPUT_FILE_NAME = "yuho.csv"
 IS_EXTRACTED = True
 
 # ----- 財務情報XBRLから取得する内容 -----
-EDINETCD_COL = "ＥＤＩＮＥＴコード"
+# EDINETコードを示す要素のローカル名
+EDINET_CD_ELM_NAME = "EDINETCodeDEI"
 # 連結有無を示す要素のローカル名
 HAS_CONSOLIDATED_ELM_NAME = "WhetherConsolidatedFinancialStatementsArePreparedDEI"
 
@@ -31,19 +32,19 @@ HAS_CONSOLIDATED_ELM_NAME = "WhetherConsolidatedFinancialStatementsArePreparedDE
 # - "jppfs_cor"（財務諸表本表）:
 #   - 企業ごとに項目が異なるため、リンクベースに沿って情報を取得する
 YUHO_COLS_DICT = {
-    "jpdei_cor": {
-        HAS_CONSOLIDATED_ELM_NAME: "連結決算の有無",
-        "EDINETCodeDEI": EDINETCD_COL,
-        "AccountingStandardsDEI": "会計基準",
-        "SecurityCodeDEI": "証券コード",
-        "FilerNameInJapaneseDEI": "提出者名_有報",
-        "CurrentPeriodEndDateDEI": "当会計期間終了日",
-        "CurrentFiscalYearEndDateDEI": "当事業年度終了日"
-    },
+    "jpdei_cor": [
+        EDINET_CD_ELM_NAME,
+        "AccountingStandardsDEI",
+        "SecurityCodeDEI",
+        "FilerNameInJapaneseDEI",
+        "CurrentPeriodEndDateDEI",
+        "CurrentFiscalYearEndDateDEI"
+    ],
     "jppfs_cor": {}
 }
 
 # ----- EDINETコードリストから取得する列 -----
+EDINETCD_COL = "ＥＤＩＮＥＴコード"
 EDINETCDDLINFO_COLS = [
     EDINETCD_COL,
     "提出者業種",
@@ -52,9 +53,9 @@ EDINETCDDLINFO_COLS = [
     "提出者名"
 ]
 
-# アウトプットに追加する列
+# ----- アウトプットに列名指定で設定する列 -----
 CONSOLIDATED_OR_NONCONSOLIDATED_COL = "連結/個別"
-
+HAS_CONSOLIDATED_COL = "連結決算の有無"
 
 def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix,
                  pc_rel_set, is_consolidated):
@@ -125,7 +126,7 @@ def get_facts(model_xbrl, is_consolidated, has_consolidated):
 
     dict_facts = {}
     dict_facts[CONSOLIDATED_OR_NONCONSOLIDATED_COL] = "連結" if is_consolidated else "個別"
-    dict_facts[HAS_CONSOLIDATED_ELM_NAME] = has_consolidated
+    dict_facts[HAS_CONSOLIDATED_COL] = has_consolidated
     # リレーションシップの絞り込み用に指定するlinkrole
     if is_consolidated:
         link_role = "http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_ConsolidatedStatementOfIncome"
@@ -145,11 +146,14 @@ def get_facts(model_xbrl, is_consolidated, has_consolidated):
             for localname in localnames:
                 facts = model_xbrl.factsByQname[qname(
                     ns, name=f"{qname_prefix}:{localname}")]
-                if not facts:
-                    # （EDINETの仕様上ここは呼ばれないはずだが）
-                    dict_facts[localname] = None
+                if (not facts) or (len(facts) > 1):
+                    print(f"【想定外】1つのXBRL内に{qname_prefix}:{localname}のfactが複数存在します。")
+                    sys.exit()
+                fact = list(facts)[0]
+                if localname == EDINET_CD_ELM_NAME:
+                    dict_facts[EDINETCD_COL] = fact.value
                 else:
-                    dict_facts[localname] = list(facts)[0].value
+                    dict_facts[fact.concept.label()] = fact.value
         elif qname_prefix == "jppfs_cor":
             # 表示、計算の親子関係を表すリレーションシップを取得
             # linkrole=で対象のリンクロールに絞り込み
@@ -197,15 +201,6 @@ def get_yuho_data_with_link(xbrl_files):
             list_dict_facts.append(dict_facts)
 
     df_yuho = pd.DataFrame(list_dict_facts)
-
-    # 固定列のカラム名を日本語に変換
-    yuho_cols_rep = {
-        key: val
-        for val_level1 in YUHO_COLS_DICT.values()
-        for key, val in val_level1.items()
-    }
-    df_yuho.rename(columns=yuho_cols_rep, inplace=True)
-
     return df_yuho
 
 
