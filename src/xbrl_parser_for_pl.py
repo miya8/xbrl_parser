@@ -77,35 +77,15 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix,
         # 【備考】：abstract == True の場合、タイトル項目なので金額情報なし。
         # その表示子要素の内、合計金額を表す要素のfactを取得する
         # 1. タイトル項目をfrom(親)とする表示リレーションシップを取得
-        # 2. 1のリレーションシップのto(子)のModelObjectを取得
-        # 3. 2の子達をfrom(親)とする計算リレーションシップを取得して確認
-        #    1つがfrom(親=算出結果)、他がto(子=親の算出に使われる要素)
-        # 4. 3で得たfrom(親)のfactを取得する
+        # 2. 1のリレーションシップの内、一番最後のリレーションシップのto(子)のfactを取得する
         if mcpt_to.isAbstract:
             pc_rels_from_tgt = pc_rel_set.fromModelObject(mcpt_to)
             if len(pc_rels_from_tgt) == 1:
-                print(f"【想定外】勘定科目_abstract の子が1件のみ　Qname: {mcpt_to.qname}")
+                print(f"【想定外】勘定科目のタイトル項目の子が1件のみ　Qname: {mcpt_to.qname}")
                 sys.exit()
-            mcpt_to_its_children = []
-            for pc_rel in pc_rels_from_tgt:
-                mcpt_to_its_children.append(pc_rel.toModelObject)
-            mcpt_to_tmp = None
-            for mcpt_to_its_child in mcpt_to_its_children:
-                cal_rels_children = cal_rel_set.fromModelObject(
-                    mcpt_to_its_child)
-                if len(cal_rels_children) == len(pc_rels_from_tgt) - 1:
-                    mc_children = set()
-                    for cal_rel in cal_rels_children:
-                        mc_children.add(cal_rel.toModelObject)
-                    set_mcpt_to_its_children = set(mcpt_to_its_children)
-                    set_mcpt_to_its_children.remove(mcpt_to_its_child)
-                    if mc_children == set_mcpt_to_its_children:
-                        mcpt_to_tmp = mcpt_to_its_child
-                        break
-            if mcpt_to_tmp is None:
-                print("【想定外】勘定科目_abstractの子達の計算関係にfrom(親)が存在しません。")
-                sys.exit()
-            mcpt_to = mcpt_to_tmp
+            # 【備考】タイトル項目を親とする表示リレーションシップの内、
+            # 最後がタイトル項目の実体を表す値。
+            mcpt_to = pc_rels_from_tgt[len(pc_rels_from_tgt)-1].toModelObject
 
         # fact を取得
         # 【備考】1つの要素に対し、コンテキスト・ユニットの異なる複数のfactが存在し得る
