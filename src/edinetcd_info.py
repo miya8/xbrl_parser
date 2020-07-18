@@ -14,17 +14,6 @@ from utils import extract_files_from_zip
 CHROME_PATH = "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
 EDINETCD_DOWNLOAD_PAGE_URL = "https://disclosure.edinet-fsa.go.jp/E01EW/BLMainController.jsp?uji.verb=W1E62071InitDisplay&uji.bean=ee.bean.W1E62071.EEW1E62071Bean&TID=W1E62071&PID=currentPage&SESSIONKEY=1594968624445&downloadFileName=&lgKbn=2&dflg=0&iflg=0&dispKbn=1"
 EDINETCD_DOWNLOAD_SAVE_DIR = "D:\\EDINET\\Edinetcode"
-EDINETCD_COL = "ＥＤＩＮＥＴコード"
-
-# EdinetcodeDlInfo.csv から取得する列
-# 必須項目: https://disclosure.edinet-fsa.go.jp/download/ESE140119.pdf 参照
-EDINETCDDLINFO_COLS = [
-    EDINETCD_COL,
-    "提出者業種",
-    "上場区分",
-    "提出者種別",
-    "提出者名"
-]
 
 
 def enable_headless_download(driver, edinetc_dl_tmp_dir):

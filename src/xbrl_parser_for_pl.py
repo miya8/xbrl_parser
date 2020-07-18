@@ -8,17 +8,19 @@ import pandas as pd
 
 from arelle import Cntlr, ModelManager, XbrlConst
 from arelle.ModelValue import qname
-from edinetcd_info import EDINETCD_COL, EDINETCDDLINFO_COLS, get_edinetcd_info
+from edinetcd_info import get_edinetcd_info
 from utils import extract_files_from_zip
-
-# 動作確認
-IS_TEST = True
 
 # パス関連
 EDINET_ROOT_DIR = "D:\\EDINET\\test"
 EDINET_XBRL_REGREX = "*\\XBRL\\PublicDoc\\*.xbrl"
 OUTPUT_FILE_NAME = "yuho.csv"
 
+# EDINETからダウンロードしたXBRLを含むzipファイルが解凍済かどうか
+IS_EXTRACTED = True
+
+# ----- 財務情報XBRLから取得する内容 -----
+EDINETCD_COL = "ＥＤＩＮＥＴコード"
 # 連結有無を示す要素のローカル名
 HAS_CONSOLIDATED_ELM_NAME = "WhetherConsolidatedFinancialStatementsArePreparedDEI"
 
@@ -40,6 +42,15 @@ YUHO_COLS_DICT = {
     },
     "jppfs_cor": {}
 }
+
+# ----- EDINETコードリストから取得する列 -----
+EDINETCDDLINFO_COLS = [
+    EDINETCD_COL,
+    "提出者業種",
+    "上場区分",
+    "提出者種別",
+    "提出者名"
+]
 
 # アウトプットに追加する列
 CONSOLIDATED_OR_NONCONSOLIDATED_COL = "連結/個別"
@@ -204,7 +215,7 @@ def main():
     # EDINETコードリストから企業情報を取得
     df_edinetcd_info = get_edinetcd_info(EDINETCDDLINFO_COLS)
     # EDINETからダウンロードしたZIPファイルから必要なファイルを抽出
-    if IS_TEST:
+    if IS_EXTRACTED:
         pass
     else:
         edinet_zip_dir = os.path.join(EDINET_ROOT_DIR, "zip")
