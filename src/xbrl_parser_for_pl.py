@@ -164,7 +164,7 @@ def get_facts(model_xbrl, is_consolidated, has_consolidated):
     return dict_facts
 
 
-def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
+def get_yuho_data_with_link(xbrl_files):
     """有価証券報告書の対象項目を取得し、会社情報を追加する"""
 
     list_dict_facts = []
@@ -206,15 +206,10 @@ def get_yuho_data_with_link(xbrl_files, df_edinetcd_info):
     }
     df_yuho.rename(columns=yuho_cols_rep, inplace=True)
 
-    # 企業情報をマージ
-    df_yuho = df_yuho.merge(df_edinetcd_info, on=EDINETCD_COL, how="left")
     return df_yuho
 
 
 def main():
-    # EDINETコードリストから企業情報を取得
-    df_edinetcd_info = get_edinetcd_info(EDINETCDDLINFO_COLS)
-    # EDINETからダウンロードしたZIPファイルから必要なファイルを抽出
     if IS_EXTRACTED:
         pass
     else:
@@ -226,10 +221,14 @@ def main():
                 [f"XBRL/PublicDoc/.*\.{extension}" for extension in ["xbrl", "xsd", "xml"]]
             )
         )
+    # XBRLから情報取得
     xbrl_file_regrex = os.path.join(EDINET_ROOT_DIR, EDINET_XBRL_REGREX)
     xbrl_files = glob.glob(xbrl_file_regrex)
-    # 有価証券報告書の情報を取得する
-    df_yuho = get_yuho_data_with_link(xbrl_files, df_edinetcd_info)
+    df_yuho = get_yuho_data_with_link(xbrl_files)
+    # Edinetコードリストの情報をマージ
+    df_edinetcd_info = get_edinetcd_info(EDINETCDDLINFO_COLS)
+    df_yuho = df_yuho.merge(df_edinetcd_info, on=EDINETCD_COL, how="left")
+
     df_yuho.to_csv(
         os.path.join(EDINET_ROOT_DIR, OUTPUT_FILE_NAME),
         index=False,
