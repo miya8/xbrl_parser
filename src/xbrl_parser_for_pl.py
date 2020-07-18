@@ -48,11 +48,12 @@ CONSOLIDATED_OR_NONCONSOLIDATED_COL = "連結/個別"
 def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix,
         pc_rel_set, cal_rel_set, dim_rel_set, is_consolidated):
     """
-    損益計算書LineItemsをfrom(親)とする表示リレーションシップの
-    to(子)となる各ModelConceptのfactの値を取得する。
-    但しto(子)が抽象項目の場合は、更にそのto(子)達を取得し、
-    その内、集計結果を表すModelConceptのfactの値を取得する
+    損益計算書LineItemsの直下の勘定科目の値を取得する
     """
+
+    # 【備考】ここでは表示リレーションシップを使う
+    # 計算リレーションシップで計算関係を辿ることもできるが
+    # この関数の目的には表示リレーションシップを使う方が楽だった
 
     # 損益計算書LineItemsを親とする表示リレーションシップを抽出
     qname_from = qname(ns, name=f"{qname_prefix}:StatementOfIncomeLineItems")
