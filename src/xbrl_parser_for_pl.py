@@ -23,8 +23,11 @@ OUTPUT_FILE_NAME = "yuho.csv"
 HAS_CONSOLIDATED_ELM_NAME = "WhetherConsolidatedFinancialStatementsArePreparedDEI"
 
 # キー: 名前空間名、値: ローカル名
-# "jpdei_cor"（会社・書類情報）: 以下に記載した項目は登録必須のためqname指定で取得する
-# "jppfs_cor"（財務諸表本表）: 企業ごとに項目が異なるため、リンクベースに沿って情報を取得する
+# - "jpdei_cor"（会社・書類情報）:
+#   - 今回欲しい以下の項目は全企業登録必須のため、qname指定で取得する
+#     - EDINETバリデーションガイドライン: DEI 必須項目　参照
+# - "jppfs_cor"（財務諸表本表）:
+#   - 企業ごとに項目が異なるため、リンクベースに沿って情報を取得する
 YUHO_COLS_DICT = {
     "jpdei_cor": {
         HAS_CONSOLIDATED_ELM_NAME: "連結決算の有無",
@@ -41,10 +44,14 @@ YUHO_COLS_DICT = {
 # アウトプットに追加する列
 CONSOLIDATED_OR_NONCONSOLIDATED_COL = "連結/個別"
 
-def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_set, dim_rel_set, is_consolidated):
+
+def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix,
+        pc_rel_set, cal_rel_set, dim_rel_set, is_consolidated):
     """
-    損益計算書LineItemsをfrom(親)とする表示リレーションシップのto(子)となる各ModelConceptのfactの値を取得する
-    但しto(子)が抽象項目の場合は、更にそのto(子)達の内、集計結果を表すModelConceptのfactの値を取得する
+    損益計算書LineItemsをfrom(親)とする表示リレーションシップの
+    to(子)となる各ModelConceptのfactの値を取得する。
+    但しto(子)が抽象項目の場合は、更にそのto(子)達を取得し、
+    その内、集計結果を表すModelConceptのfactの値を取得する
     """
 
     # 損益計算書LineItemsを親とする表示リレーションシップを抽出
@@ -67,16 +74,17 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
         print("modelConcept_to: ", mcpt_to)
         # -> modelConcept_to:  modelConcept[5284, qname: jppfs_cor:NetSales, type: xbrli:monetaryItemType, abstract: false, jppfs_cor_2018-03-31.xsd, line 251]
 
-        # abstract == True の場合、タイトル項目なので金額情報なし。その表示子要素の内、合計金額を表す要素のfactを取得する
-        # 【備考】：以下の処理を行う
+        # 【備考】：abstract == True の場合、タイトル項目なので金額情報なし。
+        # その表示子要素の内、合計金額を表す要素のfactを取得する
         # 1. タイトル項目をfrom(親)とする表示リレーションシップを取得
         # 2. 1のリレーションシップのto(子)のModelObjectを取得
-        # 3. 2の子達をfrom(親)とする計算リレーションシップを取得して確認　:　1つがfrom(親=算出結果)、他がto(子=親の算出に使われる要素)
+        # 3. 2の子達をfrom(親)とする計算リレーションシップを取得して確認
+        #    1つがfrom(親=算出結果)、他がto(子=親の算出に使われる要素)
         # 4. 3で得たfrom(親)のfactを取得する
         if mcpt_to.isAbstract:
             pc_rels_from_tgt = pc_rel_set.fromModelObject(mcpt_to)
             if len(pc_rels_from_tgt) == 1:
-                print(f"【想定外】勘定科目_abstract の子が1件のみ　 Qname: {mcpt_to.qname}")
+                print(f"【想定外】勘定科目_abstract の子が1件のみ　Qname: {mcpt_to.qname}")
                 sys.exit()
             mcpt_to_its_children = []
             for pc_rel in pc_rels_from_tgt:
@@ -101,13 +109,14 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix, pc_rel_set, cal_rel_se
 
         # fact を取得
         # 【備考】1つの要素に対し、コンテキスト・ユニットの異なる複数のfactが存在し得る
-        # 当期のコンテキストIDは、報告書インスタンス作成ガイドライン：5-4-5 コンテキストの設定例より
-        # - 連結財務情報:
-        #   - 当期連結時点 = CurrentYearInstant
-        #   - 当期連結期間 = CurrentYearDuration
-        # - 個別財務情報:
-        #   - 当期個別時点 = CurrentYearInstant_NonConsolidatedMember
-        #   - 当期個別期間 = CurrentYearDuration_NonConsolidatedMember
+        # - 当期のコンテキストID
+        #   報告書インスタンス作成ガイドライン：5-4-5 コンテキストの設定例　参照
+        #   - 連結財務情報:
+        #     - 当期連結時点 = CurrentYearInstant
+        #     - 当期連結期間 = CurrentYearDuration
+        #   - 個別財務情報:
+        #     - 当期個別時点 = CurrentYearInstant_NonConsolidatedMember
+        #     - 当期個別期間 = CurrentYearDuration_NonConsolidatedMember
         contextid = f"CurrentYear{mcpt_to.periodType.capitalize()}"
         if is_consolidated == False:
             contextid += "_NonConsolidatedMember"
@@ -134,32 +143,43 @@ def get_facts(model_xbrl, is_consolidated, has_consolidated):
         link_role = "http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_ConsolidatedStatementOfIncome"
     else:
         link_role = "http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_StatementOfIncome"
-    # 【備考】: 有価証券報告書xbrlから必要情報抽出（総なめしない）
-    # 1. ModelXbrlクラスのfactsByQname属性（辞書型）に すべてのfactが格納されている
-    # 2. 1のキーはQnameクラスオブジェクト。Prefix:要素名の文字列から
-    #    Qname型オブジェクトを作成するために、ModelValue.py の qname関数を使用
-    # 3. 2のvalue指定に名前空間uriが必要。ModelXbrlクラスのprefixedNamespaces属性（辞書型）から取得。
+    # 有価証券報告書xbrlから必要情報抽出
     for qname_prefix, localnames in YUHO_COLS_DICT.items():
         print("qname_prefix: ", qname_prefix)
         ns = model_xbrl.prefixedNamespaces[qname_prefix]
         if qname_prefix == "jpdei_cor":
+            # 【備考】: Qname指定でfactを取得
+            # ModelXbrlクラスのインスタンスのfactsBy*属性（辞書型）にfactが格納されている。
+            # このうち、QnameをキーとするfactsByQnameを使用する。
+            # 但し、factsByQnameのキーはQname文字列ではなく、Qnameクラスのインスタンス。
+            # 文字列からQnameインスタンスを作成するために、qname関数を使用する。
+            # qname関数の引数には名前空間uriが必要であるため、
+            # ModelXbrlクラスのprefixedNamespaces属性（辞書型）から取得。
             for localname in localnames:
                 facts = model_xbrl.factsByQname[qname(
                     ns, name=f"{qname_prefix}:{localname}")]
                 if not facts:
-                    # YUHO_COLS_DICT["jpdei_cor"]に設定した要素はEDINETの入力必須項目のため
-                    # ここは呼ばれないはず
+                    # （EDINETの仕様上ここは呼ばれないはずだが）
                     dict_facts[localname] = None
                 else:
                     dict_facts[localname] = list(facts)[0].value
         elif qname_prefix == "jppfs_cor":
             # 表示、計算の親子関係を表すリレーションシップを取得
             # linkrole=で対象のリンクロールに絞り込み
-            pc_rel_set = model_xbrl.relationshipSet(XbrlConst.parentChild, linkrole=link_role)
-            cal_rel_set = model_xbrl.relationshipSet(XbrlConst.summationItem, linkrole=link_role)
-            dim_rel_set = model_xbrl.relationshipSet(XbrlConst.domainMember, linkrole=link_role)
-            dict_facts = get_pl_facts(
-                model_xbrl, dict_facts, ns, qname_prefix, pc_rel_set, cal_rel_set, dim_rel_set, is_consolidated)
+            pc_rel_set = model_xbrl.relationshipSet(
+                XbrlConst.parentChild,
+                linkrole=link_role
+            )
+            cal_rel_set = model_xbrl.relationshipSet(
+                XbrlConst.summationItem,
+                linkrole=link_role
+            )
+            dim_rel_set = model_xbrl.relationshipSet(
+                XbrlConst.domainMember,
+                linkrole=link_role
+            )
+            dict_facts = get_pl_facts(model_xbrl, dict_facts, ns, qname_prefix,
+                                      pc_rel_set, cal_rel_set, dim_rel_set, is_consolidated)
         else:
             pass
     return dict_facts
