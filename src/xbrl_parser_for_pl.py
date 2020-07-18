@@ -46,7 +46,7 @@ CONSOLIDATED_OR_NONCONSOLIDATED_COL = "連結/個別"
 
 
 def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix,
-        pc_rel_set, cal_rel_set, dim_rel_set, is_consolidated):
+                 pc_rel_set, is_consolidated):
     """
     損益計算書LineItemsの直下の勘定科目の値を取得する
     """
@@ -70,10 +70,7 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix,
     '''
 
     for rel_from_tgt in rel_from_tgt_list:
-        print()
         mcpt_to = rel_from_tgt.toModelObject
-        print("modelConcept_to: ", mcpt_to)
-        # -> modelConcept_to:  modelConcept[5284, qname: jppfs_cor:NetSales, type: xbrli:monetaryItemType, abstract: false, jppfs_cor_2018-03-31.xsd, line 251]
 
         # 【備考】：abstract == True の場合、タイトル項目なので金額情報なし。
         # その表示子要素の内、合計金額を表す要素のfactを取得する
@@ -107,7 +104,6 @@ def get_pl_facts(model_xbrl, dict_yuho, ns, qname_prefix,
         for fact in facts:
             # 当年度の財務情報かつユニットが日本円のfactを取得する
             if (fact.contextID == contextid) and (fact.unitID == "JPY"):
-                print("localname: ", localname)
                 dict_yuho[mcpt_to.label()] = fact.value
                 break
     return dict_yuho
@@ -126,7 +122,6 @@ def get_facts(model_xbrl, is_consolidated, has_consolidated):
         link_role = "http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_StatementOfIncome"
     # 有価証券報告書xbrlから必要情報抽出
     for qname_prefix, localnames in YUHO_COLS_DICT.items():
-        print("qname_prefix: ", qname_prefix)
         ns = model_xbrl.prefixedNamespaces[qname_prefix]
         if qname_prefix == "jpdei_cor":
             # 【備考】: Qname指定でfactを取得
@@ -151,16 +146,8 @@ def get_facts(model_xbrl, is_consolidated, has_consolidated):
                 XbrlConst.parentChild,
                 linkrole=link_role
             )
-            cal_rel_set = model_xbrl.relationshipSet(
-                XbrlConst.summationItem,
-                linkrole=link_role
-            )
-            dim_rel_set = model_xbrl.relationshipSet(
-                XbrlConst.domainMember,
-                linkrole=link_role
-            )
-            dict_facts = get_pl_facts(model_xbrl, dict_facts, ns, qname_prefix,
-                                      pc_rel_set, cal_rel_set, dim_rel_set, is_consolidated)
+            dict_facts = get_pl_facts(
+                model_xbrl, dict_facts, ns, qname_prefix, pc_rel_set, is_consolidated)
         else:
             pass
     return dict_facts
