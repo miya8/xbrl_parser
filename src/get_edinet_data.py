@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import requests
 
-from edinetcd_info import EDINETCD_COL, get_edinetcd_info
+from edinetcd_info import get_edinetcd_info
 
 # TODO: 訂正有価証券報告書が出ている場合、更新する
 
@@ -34,6 +34,7 @@ EDINET_API_INFO_TYPE = 2
 EDINET_GETDOC_API_URL = "https://disclosure.edinet-fsa.go.jp/api/v1/documents/{}"
 
 # EdinetcodeDlInfo.csv から取得する列
+EDINETCD_COL = "ＥＤＩＮＥＴコード"
 TEISHUTUSHA_GYOSHU_COL = "提出者業種"
 EDINETCDDLINFO_COLS = [
     EDINETCD_COL,
