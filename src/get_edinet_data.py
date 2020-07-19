@@ -105,6 +105,7 @@ def main():
         # ファイル日付が対象日、かつ指定した種類の文書情報一覧を取得
         doc_list = get_doc_list(str_tgt_date)
         # 指定した業種の文書を取得
+        os.makedirs(EDINET_DOC_SAVE_DIR, exist_ok=True)
         failed_docs = []
         for doc in doc_list:
             gyoshu = df_edinetcd_info.loc[
