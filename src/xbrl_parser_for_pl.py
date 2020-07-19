@@ -20,14 +20,14 @@ OUTPUT_FILE_NAME = "yuho.csv"
 IS_EXTRACTED = True
 
 # ----- 財務情報XBRLから取得する内容 -----
-# EDINETコードを示す要素のローカル名
+# EDINETコードを示す要素のQnameローカル名
 EDINET_CD_ELM_NAME = "EDINETCodeDEI"
-# 連結有無を示す要素のローカル名
+# 連結有無を示す要素のQnameローカル名
 HAS_CONSOLIDATED_ELM_NAME = "WhetherConsolidatedFinancialStatementsArePreparedDEI"
 
 # キー: 名前空間名、値: ローカル名
 # - "jpdei_cor"（会社・書類情報）:
-#   - 今回欲しい以下の項目は全企業登録必須のため、qname指定で取得する
+#   - 今回欲しい以下の項目は全企業登録必須のため、Qname指定で取得する
 #     - EDINETバリデーションガイドライン: DEI 必須項目　参照
 # - "jppfs_cor"（財務諸表本表）:
 #   - 企業ごとに項目が異なるため、リンクベースに沿って情報を取得する
