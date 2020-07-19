@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import requests
 
-from edinetcd_info import EDINETCD_COL, get_edinetcd_info
+from edinetcd_info import get_edinetcd_info
 
 # TODO: 訂正有価証券報告書が出ている場合、更新する
 
@@ -34,6 +34,7 @@ EDINET_API_INFO_TYPE = 2
 EDINET_GETDOC_API_URL = "https://disclosure.edinet-fsa.go.jp/api/v1/documents/{}"
 
 # EdinetcodeDlInfo.csv から取得する列
+EDINETCD_COL = "ＥＤＩＮＥＴコード"
 TEISHUTUSHA_GYOSHU_COL = "提出者業種"
 EDINETCDDLINFO_COLS = [
     EDINETCD_COL,
@@ -104,6 +105,7 @@ def main():
         # ファイル日付が対象日、かつ指定した種類の文書情報一覧を取得
         doc_list = get_doc_list(str_tgt_date)
         # 指定した業種の文書を取得
+        os.makedirs(EDINET_DOC_SAVE_DIR, exist_ok=True)
         failed_docs = []
         for doc in doc_list:
             gyoshu = df_edinetcd_info.loc[
