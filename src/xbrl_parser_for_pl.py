@@ -56,7 +56,6 @@ EDINETCDDLINFO_COLS = [
 
 # ----- アウトプットに列名指定で設定する列 -----
 CONSOLIDATED_OR_NONCONSOLIDATED_COL = "連結/個別"
-HAS_CONSOLIDATED_COL = "連結決算の有無"
 
 
 def get_pl_facts(model_xbrl, is_consolidated):
