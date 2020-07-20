@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import sys
 import zipfile
 from datetime import datetime, timedelta
 
@@ -11,12 +12,12 @@ from edinetcd_info import get_edinetcd_info
 # TODO: 訂正有価証券報告書が出ている場合、更新する
 
 # 取得したEDINET文書の保存先
-EDINET_DOC_SAVE_DIR = "D:\\EDINET\\test\\zip"
+EDINET_DOC_SAVE_DIR = "D:\\EDINET\\120_yuho_20200101_20200630\\zip"
 # EDINET文書の保存ファイルの命名規則
 EDINET_DOC_SAVE_FILE = "{gyoshu}_{doctype}_{edinetcd}_{docid}.zip"
 # 取得対象の開始日、終了日 (yyyy-mm-dd)
-TARGET_DATE_START = "2020-04-20"
-TARGET_DATE_END = "2020-04-21"
+TARGET_DATE_START = "2020-01-01"
+TARGET_DATE_END = "2020-06-30"
 # 取得対象の文書タイプ （値はEDINET API仕様書参照）
 TGT_DOCTYPE_LIST = ["120"]
 # 取得対象の業種名（指定なしの場合空のリスト[]）
@@ -108,9 +109,22 @@ def main():
         os.makedirs(EDINET_DOC_SAVE_DIR, exist_ok=True)
         failed_docs = []
         for doc in doc_list:
-            gyoshu = df_edinetcd_info.loc[
-                df_edinetcd_info[EDINETCD_COL] == doc["edinetCode"],
-                TEISHUTUSHA_GYOSHU_COL].values[0]
+            # 縦覧首相・書類取下げによりEDINETコード（他データも）が欠損となる
+            if doc["edinetCode"] is None:
+                continue
+            # EDINETコードの集約により
+            # 最新のEDINETコードリストとマッチしないケースがある
+            # TODO: ファンドコードを基に変更後のEDINET コードを把握する
+            # EDINET API仕様書: EDINET コード自体の変更　参照
+            df_tgt = df_edinetcd_info[
+                df_edinetcd_info[EDINETCD_COL] == doc["edinetCode"]
+            ]
+            if df_tgt.shape[0] < 1:
+                continue
+            elif df_tgt.shape[0] > 1:
+                print("【想定外】EDINETコードコードリストのEDINETコードに重複があります。")
+                sys.exit()
+            gyoshu = df_tgt[TEISHUTUSHA_GYOSHU_COL].values[0]
             if TGT_GYOSHU_LIST:
                 if not gyoshu in TGT_GYOSHU_LIST:
                     continue
