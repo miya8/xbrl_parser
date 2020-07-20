@@ -106,6 +106,7 @@ def main():
         doc_list = get_doc_list(str_tgt_date)
         # 指定した業種の文書を取得
         os.makedirs(EDINET_DOC_SAVE_DIR, exist_ok=True)
+        get_num = 0
         failed_docs = []
         for doc in doc_list:
             # 縦覧首相・書類取下げによりEDINETコード（他データも）が欠損となる
@@ -133,6 +134,8 @@ def main():
             if has_successed == False:
                 print(f"取得失敗: docID {doc['docID']}")
                 failed_docs.append([doc["docID"]])
+            get_num += 1
+        print(f"ダウンロード数: {get_num}")
         # EDINETから取得失敗した文書がある場合、docidを出力しておく
         if failed_docs:
             output_path = os.path.join(
