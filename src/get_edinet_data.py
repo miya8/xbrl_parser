@@ -3,9 +3,10 @@ import json
 import os
 import sys
 import zipfile
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import requests
+from pandas import date_range
 
 from edinetcd_info import get_edinetcd_info
 
@@ -91,13 +92,11 @@ def download_zipfile(docid, doctype, edinetcd, gyoshu):
 
 
 def main():
-    date_start = datetime.strptime(TARGET_DATE_START, DATE_FORMAT)
-    date_end = datetime.strptime(TARGET_DATE_END, DATE_FORMAT)
-    days_num = (date_end - date_start).days + 1
-    tgt_dates = [
-        datetime.strftime(date_start + timedelta(n_days), DATE_FORMAT)
-        for n_days in range(days_num)
-    ]
+    tgt_dates = date_range(
+        TARGET_DATE_START,
+        TARGET_DATE_END,
+        freq="D"
+    ).strftime(DATE_FORMAT)
     # EDINETコードリストから企業情報を取得
     df_edinetcd_info = get_edinetcd_info(EDINETCDDLINFO_COLS)
     # 対象日ごとの処理
