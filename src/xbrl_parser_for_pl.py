@@ -1,3 +1,8 @@
+"""
+Arelleを使ったサンプルコード１
+有価証券報告書からDEIと損益計算書の第一階層の勘定科目の値を取得する
+"""
+
 import glob
 import os
 import re
@@ -60,11 +65,12 @@ CONSOLIDATED_OR_NONCONSOLIDATED_COL = "連結/個別"
 def get_pl_facts(model_xbrl, is_consolidated):
     """XBRLデータから損益計算書の第一階層の勘定科目の値を取得する"""
 
-    # 【備考】ここでは表示リレーションシップを使う
-    # 計算リレーションシップを使って何か処理したい場合は
-    # relationshipSetメソッドの第一引数をXbrlConst.summationItemに変更
-    # 定義リンク用もあり。arelle > XbrlConst.py 参照
-
+    # 【備考】ここでは表示リンクを使う
+    # 計算リンクや定義リンクを使う場合は
+    # relationshipSetメソッドの第一引数を変更する
+    # 引数の値は arelle > XbrlConst.py で定義されている
+    # 各リンクのアークロールはEDINETタクソノミの設定規約書: 
+    # 3-3-3 表示リンク～3-3-5 計算リンク　参照
     qname_prefix = "jppfs_cor"
     ns = model_xbrl.prefixedNamespaces[qname_prefix]
     dict_facts = {}
@@ -110,6 +116,9 @@ def get_pl_facts(model_xbrl, is_consolidated):
         #   - 個別財務情報:
         #     - 当期個別時点 = CurrentYearInstant_NonConsolidatedMember
         #     - 当期個別期間 = CurrentYearDuration_NonConsolidatedMember
+        # 損益計算書の勘定科目は基本的に期間型（Duration）
+        # ただし、前期繰越＊、当期末＊など時点型（Instant）も稀に定義されている
+        # EDINET勘定科目リスト　参照
         contextid = f"CurrentYear{mcpt_to.periodType.capitalize()}"
         if is_consolidated == False:
             contextid += "_NonConsolidatedMember"
