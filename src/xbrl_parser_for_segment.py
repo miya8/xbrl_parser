@@ -12,7 +12,7 @@ from edinetcd_info import get_edinetcd_info
 from utils import extract_files_from_zip
 
 # パス関連
-EDINET_ROOT_DIR = "D:\\EDINET\\140_qr_from20200501to20200630_test"
+EDINET_ROOT_DIR = "D:\\EDINET\\140_qr_from20200501to20200630"
 EDINET_XBRL_REGREX = "*\\XBRL\\PublicDoc\\*.xbrl"
 OUTPUT_FILE_NAME = "qr_segment_info.csv"
 
@@ -76,7 +76,7 @@ def get_segments_facts(model_xbrl):
         print("セグメントなし")
         return None
     for fact in facts_by_dim:
-        # セグメント情報のDimensionメンバーのラベルを列、各要素を行とするデータを作成する
+        # セグメント情報のDimensionメンバー毎・対象期間毎に1行としてデータを作成する
         # 【備考】Dimensionメンバーのラベル取得方法
         # 1. fact.context.dimValue(tgt_dimension) 
         #    - factに設定されているセグメントを示すDimensionの値
@@ -93,16 +93,15 @@ def get_segments_facts(model_xbrl):
         if fact.unitID == "JPY":
             fact_label = fact.concept.label()
             end_date = fact.context.endDatetime.strftime("%Y%m%d")
-            if not fact_label in dict_facts.keys():
-                dict_facts[fact_label] = {}
-            if not end_date in dict_facts[fact_label]:
-                dict_facts[fact_label][end_date] = {}
-            dict_facts[fact_label][end_date][dim_mem_label] = fact.value
-    df_facts = pd.json_normalize(dict_facts.values())
-    df_facts.sort_index(axis=1, inplace=True)
-    cols = df_facts.columns.tolist()
-    df_facts["セグメント情報"] = dict_facts.keys()
-    df_facts = df_facts[["セグメント情報"]+cols]
+            if not dim_mem_label in dict_facts.keys():
+                dict_facts[dim_mem_label] = {}
+            if not end_date in dict_facts[dim_mem_label]:
+                dict_facts[dim_mem_label][end_date] = {"セグメント": dim_mem_label, "context_end_date": end_date}
+            dict_facts[dim_mem_label][end_date][fact_label] = fact.value
+    list_facts = [val_per_enddt for val_per_dim in dict_facts.values() for val_per_enddt in val_per_dim.values()]
+    df_facts = pd.DataFrame(list_facts)
+    df_facts.sort_values(by="context_end_date", inplace=True)
+
     return df_facts
 
 
