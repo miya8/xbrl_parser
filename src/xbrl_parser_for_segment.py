@@ -1,3 +1,8 @@
+"""
+Arelleを使ったサンプルコード２
+Dimensionを利用し、セグメント情報を取得する
+"""
+
 import glob
 import os
 import re
@@ -12,7 +17,7 @@ from edinetcd_info import get_edinetcd_info
 from utils import extract_files_from_zip
 
 # パス関連
-EDINET_ROOT_DIR = "D:\\EDINET\\140_qr_from20200501to20200630_test"
+EDINET_ROOT_DIR = "D:\\EDINET\\140_qr"
 EDINET_XBRL_REGREX = "*\\XBRL\\PublicDoc\\*.xbrl"
 OUTPUT_FILE_NAME = "qr_segment_info.csv"
 
