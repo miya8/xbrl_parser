@@ -1,6 +1,11 @@
 """
 Arelleを使ったサンプルコード１
 有価証券報告書からDEIと損益計算書の第一階層の勘定科目の値を取得する
+（会計基準 = 日本基準の書類のみ対象とする）
+
+【備考】
+- 同様の項目でも企業により項目名が異なる
+  - （売上、営業収益など）
 """
 
 import glob
@@ -25,6 +30,8 @@ OUTPUT_FILE_NAME = "yuho.csv"
 IS_EXTRACTED = True
 
 # ----- 財務情報XBRLから取得する内容 -----
+# 会計基準を示す要素
+ACCOUNTING_STD_ELM_NAME = "AccountingStandardsDEI"
 # EDINETコードを示す要素
 EDINET_CD_ELM_NAME = "EDINETCodeDEI"
 # 連結有無を示す要素
@@ -37,9 +44,9 @@ HAS_CONSOLIDATED_ELM_NAME = "WhetherConsolidatedFinancialStatementsArePreparedDE
 #   - 要素名について
 #     - タクソノミ要素リスト: DEI  (jpdei)　参照
 DEI_COLS = [
+    ACCOUNTING_STD_ELM_NAME,
     EDINET_CD_ELM_NAME,
     HAS_CONSOLIDATED_ELM_NAME,
-    "AccountingStandardsDEI",
     "SecurityCodeDEI",
     "FilerNameInJapaneseDEI",
     "CurrentPeriodEndDateDEI",
@@ -69,7 +76,7 @@ def get_pl_facts(model_xbrl, is_consolidated):
     # 計算リンクや定義リンクを使う場合は
     # relationshipSetメソッドの第一引数を変更する
     # 引数の値は arelle > XbrlConst.py で定義されている
-    # 各リンクのアークロールはEDINETタクソノミの設定規約書: 
+    # 各リンクのアークロールはEDINETタクソノミの設定規約書:
     # 3-3-3 表示リンク～3-3-5 計算リンク　参照
     qname_prefix = "jppfs_cor"
     ns = model_xbrl.prefixedNamespaces[qname_prefix]
@@ -155,6 +162,10 @@ def get_dei_facts(model_xbrl):
             print(f"【想定外】1つのXBRL内に{qname_prefix}:{localname}のfactが複数存在します。")
             sys.exit()
         fact = list(facts)[0]
+        if localname == ACCOUNTING_STD_ELM_NAME:
+            if fact.value != "Japan GAAP":
+                print(f"会計基準: {fact.value}　処理対象外")
+                return None, None
         if localname == EDINET_CD_ELM_NAME:
             dict_facts[EDINETCD_COL] = fact.value
         else:
@@ -182,6 +193,8 @@ def get_facts(xbrl_file):
 
     # 会社・書類情報を取得
     dict_facts_dei, has_consolidated = get_dei_facts(model_xbrl)
+    if dict_facts_dei is None:
+        return None
     # 損益計算書の情報を取得
     # 非連結または個別財務諸表はデフォルトで取得、連結ありの場合追加
     list_is_consolidated = [False]
@@ -213,18 +226,22 @@ def main():
     list_dict_facts = []
     for index, xbrl_file in enumerate(xbrl_files):
         print(xbrl_file, ":", index + 1, "/", len(xbrl_files))
-        list_dict_facts = list_dict_facts + get_facts(xbrl_file)
-    df_yuho = pd.DataFrame(list_dict_facts)
-    # Edinetコードリストの情報をマージ
-    df_edinetcd_info = get_edinetcd_info(EDINETCDDLINFO_COLS)
-    df_yuho = df_yuho.merge(df_edinetcd_info, on=EDINETCD_COL, how="left")
-
-    df_yuho.to_csv(
-        os.path.join(EDINET_ROOT_DIR, OUTPUT_FILE_NAME),
-        index=False,
-        encoding="cp932"
-    )
-    print(f"{'-'*10} 情報抽出　完了 {'-'*10}")
+        list_dict_facts_per_file = get_facts(xbrl_file)
+        if list_dict_facts_per_file is not None:
+            list_dict_facts = list_dict_facts + list_dict_facts_per_file
+    if list_dict_facts:
+        df_yuho = pd.DataFrame(list_dict_facts)
+        # Edinetコードリストの情報をマージ
+        df_edinetcd_info = get_edinetcd_info(EDINETCDDLINFO_COLS)
+        df_yuho = df_yuho.merge(df_edinetcd_info, on=EDINETCD_COL, how="left")
+        df_yuho.to_csv(
+            os.path.join(EDINET_ROOT_DIR, OUTPUT_FILE_NAME),
+            index=False,
+            encoding="cp932"
+        )
+        print(f"{'-'*10} 情報抽出　完了 {'-'*10}")
+    else:
+        print("処理対象のデータはありませんでした。")
 
 
 if __name__ == "__main__":

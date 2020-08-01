@@ -1,6 +1,13 @@
 """
 Arelleを使ったサンプルコード２
 Dimensionを利用し、セグメント情報を取得する
+（会計基準 = 日本基準の書類のみ対象とする）
+
+【備考】
+- セグメント利益の項目は、企業により報告している利益の種類が異なる
+  - （売上総利益、経常利益、など）
+- 同様の項目でも企業により項目名が異なる
+  - （売上高を示す名称: 売上、営業収益など）
 """
 
 import glob
@@ -17,7 +24,7 @@ from edinetcd_info import get_edinetcd_info
 from utils import extract_files_from_zip
 
 # パス関連
-EDINET_ROOT_DIR = "D:\\EDINET\\140_qr"
+EDINET_ROOT_DIR = "D:\\EDINET\\140_qr_from20200501to20200630_test"
 EDINET_XBRL_REGREX = "*\\XBRL\\PublicDoc\\*.xbrl"
 OUTPUT_FILE_NAME = "qr_segment_info.csv"
 
@@ -25,6 +32,8 @@ OUTPUT_FILE_NAME = "qr_segment_info.csv"
 IS_EXTRACTED = True
 
 # ----- 財務情報XBRLから取得する内容 -----
+# 会計基準を示す要素
+ACCOUNTING_STD_ELM_NAME = "AccountingStandardsDEI"
 # EDINETコードを示す要素
 EDINET_CD_ELM_NAME = "EDINETCodeDEI"
 # 連結有無を示す要素
@@ -39,10 +48,10 @@ DOC_TYPE_ELM_NAME = "DocumentTypeDEI"
 #   - 要素名について
 #     - タクソノミ要素リスト: DEI  (jpdei)　参照
 DEI_COLS = [
+    ACCOUNTING_STD_ELM_NAME,
     DOC_TYPE_ELM_NAME,
     EDINET_CD_ELM_NAME,
     HAS_CONSOLIDATED_ELM_NAME,
-    "AccountingStandardsDEI",
     "SecurityCodeDEI",
     "FilerNameInJapaneseDEI",
     "CurrentPeriodEndDateDEI",
@@ -131,8 +140,13 @@ def get_dei_facts(model_xbrl):
             print(f"【想定外】1つのXBRL内に{qname_prefix}:{localname}のfactが複数存在します。")
             sys.exit()
         fact = list(facts)[0]
+        if localname == ACCOUNTING_STD_ELM_NAME:
+            if fact.value != "Japan GAAP":
+                print(f"会計基準: {fact.value}　処理対象外")
+                return None
         if localname == DOC_TYPE_ELM_NAME:
             if fact.value != "第四号の三様式":
+                print(f"提出書類の様式: {fact.value}　処理対象外")
                 return None
         if localname == EDINET_CD_ELM_NAME:
             dict_facts[EDINETCD_COL] = fact.value
@@ -143,20 +157,20 @@ def get_dei_facts(model_xbrl):
 
 
 def get_facts(xbrl_file):
-    """有価証券報告書から情報を取得する"""
+    """XBRL形式のデータから情報を取得する"""
 
     ctrl = Cntlr.Cntlr()
     model_manager = ModelManager.initialize(ctrl)
     model_xbrl = model_manager.load(xbrl_file)
 
-    # セグメント情報を取得
-    df_facts_segment = get_segments_facts(model_xbrl)
-    if df_facts_segment is None:
-        return None
-
     # 会社・書類情報を取得
     df_facts_dei = get_dei_facts(model_xbrl)
     if df_facts_dei is None:
+        return None
+
+    # セグメント情報を取得
+    df_facts_segment = get_segments_facts(model_xbrl)
+    if df_facts_segment is None:
         return None
 
     # マージ
@@ -179,24 +193,29 @@ def main():
                 [f"XBRL/PublicDoc/.*\.{extension}" for extension in ["xbrl", "xsd", "xml"]]
             )
         )
+    
     # XBRLから情報取得
     xbrl_file_regrex = os.path.join(EDINET_ROOT_DIR, EDINET_XBRL_REGREX)
     xbrl_files = glob.glob(xbrl_file_regrex)
     list_df_facts = []
     for index, xbrl_file in enumerate(xbrl_files):
         print(xbrl_file, ":", index + 1, "/", len(xbrl_files))
-        list_df_facts.append(get_facts(xbrl_file))
-    df_xbrl = pd.concat(list_df_facts, axis=0, sort=False)
-    # Edinetコードリストの情報をマージ
-    df_edinetcd_info = get_edinetcd_info(EDINETCDDLINFO_COLS)
-    df_xbrl = df_edinetcd_info.merge(df_xbrl, on=EDINETCD_COL, how="right")
-
-    df_xbrl.to_csv(
-        os.path.join(EDINET_ROOT_DIR, OUTPUT_FILE_NAME),
-        index=False,
-        encoding="cp932"
-    )
-    print(f"{'-'*10} 情報抽出　完了 {'-'*10}")
+        df_facts = get_facts(xbrl_file)
+        if df_facts is not None:
+            list_df_facts.append(df_facts)
+    if list_df_facts.append(df_facts):
+        df_xbrl = pd.concat(list_df_facts, axis=0, sort=False)
+        # Edinetコードリストの情報をマージ
+        df_edinetcd_info = get_edinetcd_info(EDINETCDDLINFO_COLS)
+        df_xbrl = df_edinetcd_info.merge(df_xbrl, on=EDINETCD_COL, how="right")
+        df_xbrl.to_csv(
+            os.path.join(EDINET_ROOT_DIR, OUTPUT_FILE_NAME),
+            index=False,
+            encoding="cp932"
+        )
+        print(f"{'-'*10} 情報抽出　完了 {'-'*10}")
+    else:
+        print("処理対象のデータはありませんでした。")
 
 
 if __name__ == "__main__":
