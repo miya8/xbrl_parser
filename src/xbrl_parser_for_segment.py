@@ -72,7 +72,7 @@ EDINETCDDLINFO_COLS = [
 
 
 def get_segments_facts(model_xbrl):
-    """XBRLデータから損益計算書の第一階層の勘定科目の値を取得する"""
+    """XBRLデータからセグメント情報を取得する"""
 
     qname_prefix = "jpcrp_cor"
     ns = model_xbrl.prefixedNamespaces[qname_prefix]
