@@ -22,7 +22,7 @@ from edinetcd_info import get_edinetcd_info
 from utils import extract_files_from_zip
 
 # パス関連
-EDINET_ROOT_DIR = "D:\\EDINET\\test"
+EDINET_ROOT_DIR = "D:\\EDINET\\120_yuho"
 EDINET_XBRL_REGREX = "*\\XBRL\\PublicDoc\\*.xbrl"
 OUTPUT_FILE_NAME = "yuho.csv"
 
@@ -106,8 +106,15 @@ def get_pl_facts(model_xbrl, is_consolidated):
         # 2. 1のリレーションシップの内、一番最後のリレーションシップのto(子)のfactを取得する
         if mcpt_to.isAbstract:
             pc_rels_from_tgt = pc_rel_set.fromModelObject(mcpt_to)
-            if len(pc_rels_from_tgt) == 1:
-                print(f"【想定外】勘定科目のタイトル項目の子が1件のみ　Qname: {mcpt_to.qname}")
+            # 【備考】：タイトル項目に子が存在しないケースがあった。
+            # （表示リンク・定義リンク共に）該当項目を親とする関係が定義されておらず
+            # 該当項目と同階層に該当項目の内訳が定義されていた、という状況。
+            # 関係が正しく定義されていないため、当スクリプトでは処理対象から除外する
+            if not pc_rels_from_tgt:
+                print(f"{mcpt_to.qname.localName} に子が存在しない")
+                return None
+            elif len(pc_rels_from_tgt) == 1:
+                print(f"【想定外】勘定科目のタイトル項目{mcpt_to.qname.localName} の子が1件のみ")
                 sys.exit()
             # 【備考】タイトル項目を親とする表示リレーションシップの内、
             # 最後がタイトル項目の実体を表す値。
@@ -203,6 +210,8 @@ def get_facts(xbrl_file):
     list_dict_facts = []
     for is_consolidated in list_is_consolidated:
         dict_facts_pl = get_pl_facts(model_xbrl, is_consolidated)
+        if dict_facts_pl is None:
+            return None
         dict_facts_pl[CONSOLIDATED_OR_NONCONSOLIDATED_COL] = "連結" if is_consolidated else "個別／非連結"
         list_dict_facts.append({**dict_facts_dei, **dict_facts_pl})
     return list_dict_facts
