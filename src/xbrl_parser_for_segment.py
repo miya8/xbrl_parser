@@ -7,7 +7,7 @@ Dimensionを利用し、セグメント情報を取得する
 - セグメント利益の項目は、企業により報告している利益の種類が異なる
   - （売上総利益、経常利益、など）
 - 同様の項目でも企業により項目名が異なる
-  - （売上高を示す名称: 売上、営業収益など）
+  - （売上、営業収益など）
 """
 
 import glob
@@ -24,9 +24,12 @@ from edinetcd_info import get_edinetcd_info
 from utils import extract_files_from_zip
 
 # パス関連
-EDINET_ROOT_DIR = "D:\\EDINET\\140_qr_from20200501to20200630_test"
+EDINET_ROOT_DIR = "D:\\EDINET\\140_qr_test"
 EDINET_XBRL_REGREX = "*\\XBRL\\PublicDoc\\*.xbrl"
 OUTPUT_FILE_NAME = "qr_segment_info.csv"
+
+# 様式指定
+TGT_DOC_TYPE = "第四号の三様式"
 
 # EDINETからダウンロードしたXBRLを含むzipファイルが解凍済かどうか
 IS_EXTRACTED = True
@@ -143,7 +146,7 @@ def get_dei_facts(model_xbrl):
                 print(f"会計基準: {fact.value}　処理対象外")
                 return None
         if localname == DOC_TYPE_ELM_NAME:
-            if fact.value != "第四号の三様式":
+            if fact.value != TGT_DOC_TYPE:
                 print(f"提出書類の様式: {fact.value}　処理対象外")
                 return None
         if localname == EDINET_CD_ELM_NAME:
