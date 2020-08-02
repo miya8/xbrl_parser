@@ -1,3 +1,13 @@
+"""
+Arelleを使ったサンプルコード１
+有価証券報告書からDEIと損益計算書の第一階層の勘定科目の値を取得する
+（会計基準 = 日本基準の書類のみ対象とする）
+
+【備考】
+- 同様の項目でも企業により項目名が異なる
+  - （売上、営業収益など）
+"""
+
 import glob
 import os
 import re
@@ -12,7 +22,7 @@ from edinetcd_info import get_edinetcd_info
 from utils import extract_files_from_zip
 
 # パス関連
-EDINET_ROOT_DIR = "D:\\EDINET\\test"
+EDINET_ROOT_DIR = "D:\\EDINET\\120_yuho_test"
 EDINET_XBRL_REGREX = "*\\XBRL\\PublicDoc\\*.xbrl"
 OUTPUT_FILE_NAME = "yuho.csv"
 
@@ -20,6 +30,8 @@ OUTPUT_FILE_NAME = "yuho.csv"
 IS_EXTRACTED = True
 
 # ----- 財務情報XBRLから取得する内容 -----
+# 会計基準を示す要素
+ACCOUNTING_STD_ELM_NAME = "AccountingStandardsDEI"
 # EDINETコードを示す要素
 EDINET_CD_ELM_NAME = "EDINETCodeDEI"
 # 連結有無を示す要素
@@ -32,9 +44,9 @@ HAS_CONSOLIDATED_ELM_NAME = "WhetherConsolidatedFinancialStatementsArePreparedDE
 #   - 要素名について
 #     - タクソノミ要素リスト: DEI  (jpdei)　参照
 DEI_COLS = [
+    ACCOUNTING_STD_ELM_NAME,
     EDINET_CD_ELM_NAME,
     HAS_CONSOLIDATED_ELM_NAME,
-    "AccountingStandardsDEI",
     "SecurityCodeDEI",
     "FilerNameInJapaneseDEI",
     "CurrentPeriodEndDateDEI",
@@ -60,11 +72,12 @@ CONSOLIDATED_OR_NONCONSOLIDATED_COL = "連結/個別"
 def get_pl_facts(model_xbrl, is_consolidated):
     """XBRLデータから損益計算書の第一階層の勘定科目の値を取得する"""
 
-    # 【備考】ここでは表示リレーションシップを使う
-    # 計算リレーションシップを使って何か処理したい場合は
-    # relationshipSetメソッドの第一引数をXbrlConst.summationItemに変更
-    # 定義リンク用もあり。arelle > XbrlConst.py 参照
-
+    # 【備考】ここでは表示リンクを使う
+    # 計算リンクや定義リンクを使う場合は
+    # relationshipSetメソッドの第一引数を変更する
+    # 引数の値は arelle > XbrlConst.py で定義されている
+    # 各リンクのアークロールはEDINETタクソノミの設定規約書:
+    # 3-3-3 表示リンク～3-3-5 計算リンク　参照
     qname_prefix = "jppfs_cor"
     ns = model_xbrl.prefixedNamespaces[qname_prefix]
     dict_facts = {}
@@ -93,12 +106,14 @@ def get_pl_facts(model_xbrl, is_consolidated):
         # 2. 1のリレーションシップの内、一番最後のリレーションシップのto(子)のfactを取得する
         if mcpt_to.isAbstract:
             pc_rels_from_tgt = pc_rel_set.fromModelObject(mcpt_to)
-            if len(pc_rels_from_tgt) == 1:
-                print(f"【想定外】勘定科目のタイトル項目の子が1件のみ　Qname: {mcpt_to.qname}")
-                sys.exit()
-            # 【備考】タイトル項目を親とする表示リレーションシップの内、
-            # 最後がタイトル項目の実体を表す値。
-            mcpt_to = pc_rels_from_tgt[len(pc_rels_from_tgt)-1].toModelObject
+            # 【備考】：タイトル項目のfactに子が存在しないケースがあった。
+            # （表示リンク・定義リンク共に）該当項目を親とする関係が定義されておらず
+            # 該当項目と同階層に該当項目の内訳が定義されていた。
+            # 関係が正しく定義されていないため、当スクリプトでは処理対象から除外する
+            if not pc_rels_from_tgt:
+                print(f"{mcpt_to.qname.localName} に子が存在しない")
+                return None
+            mcpt_to = pc_rels_from_tgt[-1].toModelObject
 
         # fact を取得
         # 【備考】1つの要素に対し、コンテキスト・ユニットの異なる複数のfactが存在し得る
@@ -110,6 +125,9 @@ def get_pl_facts(model_xbrl, is_consolidated):
         #   - 個別財務情報:
         #     - 当期個別時点 = CurrentYearInstant_NonConsolidatedMember
         #     - 当期個別期間 = CurrentYearDuration_NonConsolidatedMember
+        # 損益計算書は会計期間の損益を表すので勘定科目は期間型（Duration）
+        # ただし、前期繰越＊、当期末＊など時点型（Instant）の勘定科目も一部定義されている
+        # EDINET勘定科目リスト　参照
         contextid = f"CurrentYear{mcpt_to.periodType.capitalize()}"
         if is_consolidated == False:
             contextid += "_NonConsolidatedMember"
@@ -137,8 +155,6 @@ def get_dei_facts(model_xbrl):
     # このうち、QnameをキーとするfactsByQnameを使用する。
     # 但し、factsByQnameのキーはQname文字列ではなく、Qnameクラスのインスタンス。
     # 文字列からQnameインスタンスを作成するために、qname関数を使用する。
-    # qname関数の引数には名前空間uriが必要であるため、
-    # ModelXbrlクラスのprefixedNamespaces属性（辞書型）から取得。
     for localname in DEI_COLS:
         facts = model_xbrl.factsByQname[qname(
             ns, name=f"{qname_prefix}:{localname}")]
@@ -146,6 +162,10 @@ def get_dei_facts(model_xbrl):
             print(f"【想定外】1つのXBRL内に{qname_prefix}:{localname}のfactが複数存在します。")
             sys.exit()
         fact = list(facts)[0]
+        if localname == ACCOUNTING_STD_ELM_NAME:
+            if fact.value != "Japan GAAP":
+                print(f"会計基準: {fact.value}　処理対象外")
+                return None, None
         if localname == EDINET_CD_ELM_NAME:
             dict_facts[EDINETCD_COL] = fact.value
         else:
@@ -164,15 +184,14 @@ def get_dei_facts(model_xbrl):
     return dict_facts, has_consolidated
 
 
-def get_facts(xbrl_file):
+def get_facts(model_manager, xbrl_file):
     """有価証券報告書から情報を取得する"""
 
-    ctrl = Cntlr.Cntlr()
-    model_manager = ModelManager.initialize(ctrl)
     model_xbrl = model_manager.load(xbrl_file)
-
     # 会社・書類情報を取得
     dict_facts_dei, has_consolidated = get_dei_facts(model_xbrl)
+    if dict_facts_dei is None:
+        return None
     # 損益計算書の情報を取得
     # 非連結または個別財務諸表はデフォルトで取得、連結ありの場合追加
     list_is_consolidated = [False]
@@ -181,8 +200,12 @@ def get_facts(xbrl_file):
     list_dict_facts = []
     for is_consolidated in list_is_consolidated:
         dict_facts_pl = get_pl_facts(model_xbrl, is_consolidated)
+        if dict_facts_pl is None:
+            return None
         dict_facts_pl[CONSOLIDATED_OR_NONCONSOLIDATED_COL] = "連結" if is_consolidated else "個別／非連結"
         list_dict_facts.append({**dict_facts_dei, **dict_facts_pl})
+
+    model_manager.close()
     return list_dict_facts
 
 
@@ -202,20 +225,26 @@ def main():
     xbrl_file_regrex = os.path.join(EDINET_ROOT_DIR, EDINET_XBRL_REGREX)
     xbrl_files = glob.glob(xbrl_file_regrex)
     list_dict_facts = []
+    ctrl = Cntlr.Cntlr()
+    model_manager = ModelManager.initialize(ctrl)
     for index, xbrl_file in enumerate(xbrl_files):
         print(xbrl_file, ":", index + 1, "/", len(xbrl_files))
-        list_dict_facts = list_dict_facts + get_facts(xbrl_file)
-    df_yuho = pd.DataFrame(list_dict_facts)
-    # Edinetコードリストの情報をマージ
-    df_edinetcd_info = get_edinetcd_info(EDINETCDDLINFO_COLS)
-    df_yuho = df_yuho.merge(df_edinetcd_info, on=EDINETCD_COL, how="left")
-
-    df_yuho.to_csv(
-        os.path.join(EDINET_ROOT_DIR, OUTPUT_FILE_NAME),
-        index=False,
-        encoding="cp932"
-    )
-    print(f"{'-'*10} 情報抽出　完了 {'-'*10}")
+        list_dict_facts_per_file = get_facts(model_manager, xbrl_file)
+        if list_dict_facts_per_file is not None:
+            list_dict_facts = list_dict_facts + list_dict_facts_per_file
+    if list_dict_facts:
+        df_yuho = pd.DataFrame(list_dict_facts)
+        # Edinetコードリストの情報をマージ
+        df_edinetcd_info = get_edinetcd_info(EDINETCDDLINFO_COLS)
+        df_yuho = df_yuho.merge(df_edinetcd_info, on=EDINETCD_COL, how="left")
+        df_yuho.to_csv(
+            os.path.join(EDINET_ROOT_DIR, OUTPUT_FILE_NAME),
+            index=False,
+            encoding="cp932"
+        )
+        print(f"{'-'*10} 情報抽出　完了 {'-'*10}")
+    else:
+        print("処理対象のデータはありませんでした。")
 
 
 if __name__ == "__main__":
