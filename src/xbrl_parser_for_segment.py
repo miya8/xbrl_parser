@@ -57,7 +57,7 @@ DEI_COLS = [
     "CurrentPeriodEndDateDEI",
     "CurrentFiscalYearEndDateDEI"
 ]
-# 【備考】財務諸表本表の項目は企業ごとに項目が異なるため、
+# 【備考】財務諸表本表の勘定科目は企業ごとに異なるため、
 # リンクベースに沿って情報を取得する
 
 # ----- EDINETコードリストから取得する列 -----
@@ -90,7 +90,7 @@ def get_segments_facts(model_xbrl):
         print("セグメントなし")
         return None
     for fact in facts_by_dim:
-        # セグメント情報のDimensionメンバー毎・会計期間毎に1行としてデータを作成する
+        # セグメント情報のDimensionメンバーごと・会計期間毎に1行としてデータを作成する
         # 【備考】Dimensionメンバーのラベル取得方法
         # 1. fact.context.dimValue(tgt_dimension) 
         #    - factに設定されているセグメントを示すDimensionの値
@@ -131,8 +131,6 @@ def get_dei_facts(model_xbrl):
     # このうち、QnameをキーとするfactsByQnameを使用する。
     # 但し、factsByQnameのキーはQname文字列ではなく、Qnameクラスのインスタンス。
     # 文字列からQnameインスタンスを作成するために、qname関数を使用する。
-    # qname関数の引数には名前空間uriが必要であるため、
-    # ModelXbrlクラスのprefixedNamespaces属性（辞書型）から取得。
     for localname in DEI_COLS:
         facts = model_xbrl.factsByQname[qname(
             ns, name=f"{qname_prefix}:{localname}")]
@@ -156,11 +154,9 @@ def get_dei_facts(model_xbrl):
     return pd.DataFrame([dict_facts])
 
 
-def get_facts(xbrl_file):
+def get_facts(model_manager, xbrl_file):
     """XBRL形式のデータから情報を取得する"""
 
-    ctrl = Cntlr.Cntlr()
-    model_manager = ModelManager.initialize(ctrl)
     model_xbrl = model_manager.load(xbrl_file)
 
     # 会社・書類情報を取得
@@ -178,6 +174,7 @@ def get_facts(xbrl_file):
     df_facts_dei.loc[:, "key"] = 1
     df_facts = df_facts_dei.merge(df_facts_segment, on="key", how="left").drop(columns=["key"])
 
+    model_manager.close()
     return df_facts
 
 
@@ -198,12 +195,14 @@ def main():
     xbrl_file_regrex = os.path.join(EDINET_ROOT_DIR, EDINET_XBRL_REGREX)
     xbrl_files = glob.glob(xbrl_file_regrex)
     list_df_facts = []
+    ctrl = Cntlr.Cntlr()
+    model_manager = ModelManager.initialize(ctrl)
     for index, xbrl_file in enumerate(xbrl_files):
         print(xbrl_file, ":", index + 1, "/", len(xbrl_files))
-        df_facts = get_facts(xbrl_file)
+        df_facts = get_facts(model_manager, xbrl_file)
         if df_facts is not None:
             list_df_facts.append(df_facts)
-    if list_df_facts.append(df_facts):
+    if list_df_facts:
         df_xbrl = pd.concat(list_df_facts, axis=0, sort=False)
         # Edinetコードリストの情報をマージ
         df_edinetcd_info = get_edinetcd_info(EDINETCDDLINFO_COLS)

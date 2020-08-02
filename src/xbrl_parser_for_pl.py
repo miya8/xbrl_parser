@@ -22,7 +22,7 @@ from edinetcd_info import get_edinetcd_info
 from utils import extract_files_from_zip
 
 # パス関連
-EDINET_ROOT_DIR = "D:\\EDINET\\120_yuho"
+EDINET_ROOT_DIR = "D:\\EDINET\\120_yuho_test"
 EDINET_XBRL_REGREX = "*\\XBRL\\PublicDoc\\*.xbrl"
 OUTPUT_FILE_NAME = "yuho.csv"
 
@@ -108,7 +108,7 @@ def get_pl_facts(model_xbrl, is_consolidated):
             pc_rels_from_tgt = pc_rel_set.fromModelObject(mcpt_to)
             # 【備考】：タイトル項目のfactに子が存在しないケースがあった。
             # （表示リンク・定義リンク共に）該当項目を親とする関係が定義されておらず
-            # 該当項目と同階層に該当項目の内訳が定義されていた、という状況。
+            # 該当項目と同階層に該当項目の内訳が定義されていた。
             # 関係が正しく定義されていないため、当スクリプトでは処理対象から除外する
             if not pc_rels_from_tgt:
                 print(f"{mcpt_to.qname.localName} に子が存在しない")
@@ -125,8 +125,8 @@ def get_pl_facts(model_xbrl, is_consolidated):
         #   - 個別財務情報:
         #     - 当期個別時点 = CurrentYearInstant_NonConsolidatedMember
         #     - 当期個別期間 = CurrentYearDuration_NonConsolidatedMember
-        # 損益計算書の勘定科目は基本的に期間型（Duration）
-        # ただし、前期繰越＊、当期末＊など時点型（Instant）も稀に定義されている
+        # 損益計算書は会計期間の損益を表すので勘定科目は期間型（Duration）
+        # ただし、前期繰越＊、当期末＊など時点型（Instant）の勘定科目も一部定義されている
         # EDINET勘定科目リスト　参照
         contextid = f"CurrentYear{mcpt_to.periodType.capitalize()}"
         if is_consolidated == False:
@@ -155,8 +155,6 @@ def get_dei_facts(model_xbrl):
     # このうち、QnameをキーとするfactsByQnameを使用する。
     # 但し、factsByQnameのキーはQname文字列ではなく、Qnameクラスのインスタンス。
     # 文字列からQnameインスタンスを作成するために、qname関数を使用する。
-    # qname関数の引数には名前空間uriが必要であるため、
-    # ModelXbrlクラスのprefixedNamespaces属性（辞書型）から取得。
     for localname in DEI_COLS:
         facts = model_xbrl.factsByQname[qname(
             ns, name=f"{qname_prefix}:{localname}")]
@@ -186,13 +184,10 @@ def get_dei_facts(model_xbrl):
     return dict_facts, has_consolidated
 
 
-def get_facts(xbrl_file):
+def get_facts(model_manager, xbrl_file):
     """有価証券報告書から情報を取得する"""
 
-    ctrl = Cntlr.Cntlr()
-    model_manager = ModelManager.initialize(ctrl)
     model_xbrl = model_manager.load(xbrl_file)
-
     # 会社・書類情報を取得
     dict_facts_dei, has_consolidated = get_dei_facts(model_xbrl)
     if dict_facts_dei is None:
@@ -209,6 +204,8 @@ def get_facts(xbrl_file):
             return None
         dict_facts_pl[CONSOLIDATED_OR_NONCONSOLIDATED_COL] = "連結" if is_consolidated else "個別／非連結"
         list_dict_facts.append({**dict_facts_dei, **dict_facts_pl})
+
+    model_manager.close()
     return list_dict_facts
 
 
@@ -228,9 +225,11 @@ def main():
     xbrl_file_regrex = os.path.join(EDINET_ROOT_DIR, EDINET_XBRL_REGREX)
     xbrl_files = glob.glob(xbrl_file_regrex)
     list_dict_facts = []
+    ctrl = Cntlr.Cntlr()
+    model_manager = ModelManager.initialize(ctrl)
     for index, xbrl_file in enumerate(xbrl_files):
         print(xbrl_file, ":", index + 1, "/", len(xbrl_files))
-        list_dict_facts_per_file = get_facts(xbrl_file)
+        list_dict_facts_per_file = get_facts(model_manager, xbrl_file)
         if list_dict_facts_per_file is not None:
             list_dict_facts = list_dict_facts + list_dict_facts_per_file
     if list_dict_facts:

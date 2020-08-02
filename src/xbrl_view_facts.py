@@ -1,6 +1,6 @@
 """
 Arelleを使ったサンプルコード３
-損益計算書を階層構造で出力する
+XBRL形式のデータを階層構造で出力する
 """
 
 import glob
@@ -18,22 +18,25 @@ EDINET_ROOT_DIR = "D:\\EDINET\\120_yuho_test"
 EDINET_XBRL_REGREX = "*\\XBRL\\PublicDoc\\*.xbrl"
 OUTPUT_FILE_NAME = "yuho_viewFacts_{fname}.csv"
 
+# 取得対象のリンクロール
+#TGT_LINK_ROLE = None #リンクロール指定しない
+TGT_LINK_ROLE = "http://disclosure.edinet-fsa.go.jp/role/jpcrp/rol_BusinessResultsOfReportingCompany"
+
 # EDINETからダウンロードしたXBRLを含むzipファイルが解凍済かどうか
 IS_EXTRACTED = True
 
 
-def export_facts(xbrl_file):
+def export_facts(model_manager, xbrl_file):
     """XBRLデータを階層構造で出力する"""
 
-    ctrl = Cntlr.Cntlr()
-    model_manager = ModelManager.initialize(ctrl)
     model_xbrl = model_manager.load(xbrl_file)
     filename = re.search(r'E\d+', os.path.split(xbrl_file)[1]).group()
     ViewFileFactTable.viewFacts(
         model_xbrl,
         os.path.join(EDINET_ROOT_DIR, OUTPUT_FILE_NAME.format(fname=filename)),
-        linkrole="http://disclosure.edinet-fsa.go.jp/role/jppfs/rol_StatementOfIncome"
+        linkrole=TGT_LINK_ROLE
     )
+    model_manager.close()
 
 
 def main():
@@ -51,9 +54,11 @@ def main():
     # XBRLから情報取得
     xbrl_file_regrex = os.path.join(EDINET_ROOT_DIR, EDINET_XBRL_REGREX)
     xbrl_files = glob.glob(xbrl_file_regrex)
+    ctrl = Cntlr.Cntlr()
+    model_manager = ModelManager.initialize(ctrl)
     for index, xbrl_file in enumerate(xbrl_files):
         print(xbrl_file, ":", index + 1, "/", len(xbrl_files))
-        export_facts(xbrl_file)
+        export_facts(model_manager, xbrl_file)
 
     print(f"{'-'*10} XBRL出力　完了 {'-'*10}")
 
