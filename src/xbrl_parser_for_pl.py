@@ -106,19 +106,14 @@ def get_pl_facts(model_xbrl, is_consolidated):
         # 2. 1のリレーションシップの内、一番最後のリレーションシップのto(子)のfactを取得する
         if mcpt_to.isAbstract:
             pc_rels_from_tgt = pc_rel_set.fromModelObject(mcpt_to)
-            # 【備考】：タイトル項目に子が存在しないケースがあった。
+            # 【備考】：タイトル項目のfactに子が存在しないケースがあった。
             # （表示リンク・定義リンク共に）該当項目を親とする関係が定義されておらず
             # 該当項目と同階層に該当項目の内訳が定義されていた、という状況。
             # 関係が正しく定義されていないため、当スクリプトでは処理対象から除外する
             if not pc_rels_from_tgt:
                 print(f"{mcpt_to.qname.localName} に子が存在しない")
                 return None
-            elif len(pc_rels_from_tgt) == 1:
-                print(f"【想定外】勘定科目のタイトル項目{mcpt_to.qname.localName} の子が1件のみ")
-                sys.exit()
-            # 【備考】タイトル項目を親とする表示リレーションシップの内、
-            # 最後がタイトル項目の実体を表す値。
-            mcpt_to = pc_rels_from_tgt[len(pc_rels_from_tgt)-1].toModelObject
+            mcpt_to = pc_rels_from_tgt[-1].toModelObject
 
         # fact を取得
         # 【備考】1つの要素に対し、コンテキスト・ユニットの異なる複数のfactが存在し得る
