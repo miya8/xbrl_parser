@@ -2,7 +2,6 @@ import csv
 import json
 import os
 import sys
-import zipfile
 from datetime import datetime
 
 import requests
@@ -21,7 +20,7 @@ TARGET_DATE_START = "2020-01-01"
 TARGET_DATE_END = "2020-06-30"
 # 取得対象の文書タイプ （値はEDINET API仕様書参照）
 TGT_DOCTYPE_LIST = ["120"]
-# 取得対象の業種名（指定なしの場合空のリスト[]）
+# 取得対象の業種名（指定なしの場合、空のリスト[]）
 TGT_GYOSHU_LIST = ["サービス業", "情報・通信業"]
 
 # EDINET から取得失敗したdocIDの出力先ファイル名
@@ -47,7 +46,13 @@ EDINETCDDLINFO_COLS = [
 def extract_tgt_type_docs(res_from_edinet):
     """指定したタイプの文書情報を抽出する"""
 
-    doc_info_list = json.loads(res_from_edinet.text)["results"]
+    json_res = json.loads(res_from_edinet.text)
+    # 開示期間が過ぎている場合など取得失敗するケースあり
+    if json_res["metadata"]["status"] != "200":
+        return []
+    # 指定した日の一覧を取得
+    # 【備考】指定した日の文書がない場合、resultsは空のリスト
+    doc_info_list = json_res["results"]
     doc_info_list = [
         doc_info for doc_info in doc_info_list if doc_info["docTypeCode"] in TGT_DOCTYPE_LIST
     ]
@@ -82,6 +87,7 @@ def download_zipfile(docid, doctype, edinetcd, gyoshu):
     res = requests.get(url_doc, params={"type": 1})
     # zip形式のファイル取得成功時、zipファイルを保存
     # （"Content-Type"の値は EDINET API仕様書より）
+    # TODO: 取得失敗した場合、リトライ
     if res.headers["Content-Type"] == "application/octet-stream":
         with open(save_zfile_path, "wb") as f:
             for chunk in res.iter_content(chunk_size=1024):
@@ -126,7 +132,7 @@ def main():
                 sys.exit()
             gyoshu = df_tgt[TEISHUTUSHA_GYOSHU_COL].values[0]
             if TGT_GYOSHU_LIST:
-                if not gyoshu in TGT_GYOSHU_LIST:
+                if gyoshu not in TGT_GYOSHU_LIST:
                     continue
             edinet_cd = doc["edinetCode"]
             has_successed = download_zipfile(
