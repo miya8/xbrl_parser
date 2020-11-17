@@ -22,6 +22,8 @@ TARGET_DATE_END = "2020-06-30"
 TGT_DOCTYPE_LIST = ["120"]
 # 取得対象の業種名（指定なしの場合、空のリスト[]）
 TGT_GYOSHU_LIST = ["サービス業", "情報・通信業"]
+# 取得対象のEDINETコード（指定なしの場合、空のリスト[]）
+TGT_EDINETCD_LIST = []
 
 # EDINET から取得失敗したdocIDの出力先ファイル名
 FAILED_DOCID_OUTPUT_FILE = "取得失敗docID_ファイル日付{}_処理日時{}.csv"
@@ -135,6 +137,8 @@ def main():
                 if gyoshu not in TGT_GYOSHU_LIST:
                     continue
             edinet_cd = doc["edinetCode"]
+            if TGT_EDINETCD_LIST and (edinet_cd not in TGT_EDINETCD_LIST):
+                continue
             has_successed = download_zipfile(
                 doc["docID"], doc["docTypeCode"], edinet_cd, gyoshu)
             if has_successed == False:
