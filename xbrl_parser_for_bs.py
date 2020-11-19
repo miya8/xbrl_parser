@@ -1,6 +1,6 @@
 """
 Arelleを使ったサンプルコード４
-有価証券報告書からDEIと貸借対照表の第一階層の勘定科目の値を取得する
+有価証券報告書からDEIと貸借対照表の第三階層の勘定科目の値を取得する
 （表示リンクの利用）
 
 【備考】
@@ -71,8 +71,36 @@ EDINETCDDLINFO_COLS = [
 CONSOLIDATED_OR_NONCONSOLIDATED_COL = "連結/個別"
 
 
+def get_tgt_fact(model_xbrl, is_consolidated, ns, qname_prefix, top_str_for_contextid, mcpt):
+    """指定したModelObjectのfact を取得"""
+
+    # 【備考】1つの要素に対し、コンテキスト・ユニットの異なる複数のfactが存在し得る。
+    # コンテキストIDについては、報告書インスタンス作成ガイドライン：5-4-5 コンテキストの設定例　参照
+    # 【注意】有報では時点型／期間型どちらも当期を表す接頭辞はCurrentYearで同じだが
+    # 四半期報告書は時点型はCurrentQuarter、期間型はCurrentQuarterとCurrentYTD(累積)がある。
+    # 貸借対照表は対象期末（対象期間終了日）時点の状態を表すので勘定科目は時点型(一応periodTypeを取得)
+    # EDINET勘定科目リスト　参照
+    contextid = f"{top_str_for_contextid}{mcpt.periodType.capitalize()}"
+    if not is_consolidated:
+        contextid += "_NonConsolidatedMember"
+    facts = model_xbrl.factsByQname[qname(
+        ns, name=f"{qname_prefix}:{mcpt.qname.localName}")]
+    for fact in facts:
+        # 対象期の財務情報かつユニットが日本円のfactを取得する
+        if (fact.contextID == contextid) and (fact.unitID == "JPY"):
+            return fact.value
+    # TODO: プレフィックス対応
+    # 提出者が独自定義したタクソノミスキーマの要素はjppfs_corではないため
+    # 現状プログラムではfactを取得できない。
+    # 欲しい情報はとれているので、一旦ペンディング。
+    # 【備考】提出者別タクソノミ作成ガイドライン > 「要素の定義」参照
+    print("abstract==Falseの勘定科目のfactを取得できませんでした。")
+    print(f"{qname_prefix}:{mcpt.qname.localName}")
+    return None
+
+
 def get_bs_facts(model_xbrl, is_consolidated, type_of_period):
-    """XBRLデータから貸借対照表の第一階層の勘定科目の値を取得する"""
+    """XBRLデータから貸借対照表の第三階層の勘定科目の値を取得する"""
 
     qname_prefix = "jppfs_cor"
     ns = model_xbrl.prefixedNamespaces[qname_prefix]
@@ -107,53 +135,52 @@ def get_bs_facts(model_xbrl, is_consolidated, type_of_period):
         linkrole=link_role
     )
     # 貸借対照表のLineItemsを親とする表示リレーションシップを抽出
+    # 抽出した表示リレーションシップの子が第一階層の勘定科目
     qname_from = qname(ns, name=f"{qname_prefix}:BalanceSheetLineItems")
-    rel_from_tgt_list = pc_rel_set.fromModelObject(
+    rel_first_list = pc_rel_set.fromModelObject(
         model_xbrl.qnameConcepts.get(qname_from))
     # 連結四半期財務諸表を提出する場合個別四半期財務諸表の提出は要しないとされているため
     # 四半期の場合の個別はないことが多い
-    if not rel_from_tgt_list:
+    if not rel_first_list:
         print("指定したアークロールの表示リレーションシップはありませんでした。")
         print(f"指定アークロール: {link_role}")
         return None
-
-    for rel_from_tgt in rel_from_tgt_list:
-        mcpt_to = rel_from_tgt.toModelObject
-
-        # 【備考】：abstract == True の場合、タイトル項目なので金額情報なし。
-        # その表示子要素の内、合計金額を表す要素のfactを取得する
-        # 1. タイトル項目をfrom(親)とする表示リレーションシップを取得
-        # 2. 1のリレーションシップの内、一番最後のリレーションシップのto(子)のfactを取得する
-        if mcpt_to.isAbstract:
-            pc_rels_from_tgt = pc_rel_set.fromModelObject(mcpt_to)
-            # 【備考】：タイトル項目のfactに子が存在しないケースがあった。
-            # （表示リンク・定義リンク共に）該当項目を親とする関係が定義されておらず
-            # 該当項目と同階層に該当項目の内訳が定義されていた。
-            # 関係が正しく定義されていないため、当スクリプトでは処理対象から除外する
-            if not pc_rels_from_tgt:
-                print(f"{mcpt_to.qname.localName} に子が存在しない")
-                return None
-            mcpt_to = pc_rels_from_tgt[-1].toModelObject
-        
-        # fact を取得
-        # 【備考】1つの要素に対し、コンテキスト・ユニットの異なる複数のfactが存在し得る
-        # - コンテキストID
-        #   報告書インスタンス作成ガイドライン：5-4-5 コンテキストの設定例　参照
-        # 　【注意】有報では時点型／期間型どちらも当期を表す接頭辞はCurrentYearで同じだが
-        # 　　　　　四半期報告書は時点型はCurrentQuarter、期間型はCurrentQuarterとCurrentYTD(累積)がある
-        # 貸借対照表は対象期末（対象期間終了日）時点の状態を表すので勘定科目は時点型(一応periodTypeを取得)
-        # EDINET勘定科目リスト　参照
-        contextid = f"{top_str_for_contextid}{mcpt_to.periodType.capitalize()}"
-        if not is_consolidated:
-            contextid += "_NonConsolidatedMember"
-        localname = mcpt_to.qname.localName
-        facts = model_xbrl.factsByQname[qname(
-            ns, name=f"{qname_prefix}:{localname}")]
-        for fact in facts:
-            # 当年度の財務情報かつユニットが日本円のfactを取得する
-            if (fact.contextID == contextid) and (fact.unitID == "JPY"):
-                dict_facts[mcpt_to.label()] = fact.value
-                break
+    for rel_1st in rel_first_list:
+        mcpt_1st = rel_1st.toModelObject
+        # 【備考】：abstract == False の場合、実データの項目。
+        #  第二・第三階層の科目はないため、この時点でfact取得。
+        if not mcpt_1st.isAbstract:
+            dict_facts[f"{mcpt_1st.label()}"] = get_tgt_fact(
+                model_xbrl, is_consolidated, ns, qname_prefix, top_str_for_contextid, mcpt_1st)
+        # 第一階層の各勘定科目を親とする表示リレーションシップを抽出
+        # 抽出した表示リレーションシップの子が第二階層の勘定科目
+        rel_2nd_list = pc_rel_set.fromModelObject(mcpt_1st)
+        for rel_2nd in rel_2nd_list:
+            mcpt_2nd = rel_2nd.toModelObject
+            if not mcpt_2nd.isAbstract:
+                dict_facts[f"{mcpt_2nd.label()}"] = get_tgt_fact(
+                    model_xbrl, is_consolidated, ns, qname_prefix, top_str_for_contextid, mcpt_2nd)
+            # 第二階層の各勘定科目を親とする表示リレーションシップを抽出
+            # 抽出した表示リレーションシップの子が第三階層の勘定科目
+            rel_3rd_list = pc_rel_set.fromModelObject(mcpt_2nd)
+            for rel_3rd in rel_3rd_list:
+                mcpt_3rd = rel_3rd.toModelObject
+                # 【備考】：abstract == True の場合、タイトル項目なので金額情報なし。
+                # その表示子要素の内、合計金額を表す要素のfactを取得する
+                # 1. タイトル項目をfrom(親)とする表示リレーションシップを取得
+                # 2. 1のリレーションシップの内、一番最後のリレーションシップのto(子)のfactを取得する
+                if mcpt_3rd.isAbstract:
+                    pc_rels_from_tgt = pc_rel_set.fromModelObject(mcpt_3rd)
+                    # 【備考】：タイトル項目のfactに子が存在しないケースがあった。
+                    # （表示リンク・定義リンク共に）該当項目を親とする関係が定義されておらず
+                    # 該当項目と同階層に該当項目の内訳が定義されていた。
+                    # 関係が正しく定義されていないため、当スクリプトでは処理対象から除外する
+                    if not pc_rels_from_tgt:
+                        print(f"{mcpt_3rd.qname.localName} に子が存在しない")
+                        return None
+                    mcpt_3rd = pc_rels_from_tgt[-1].toModelObject
+                dict_facts[f"{mcpt_2nd.label()}_{mcpt_3rd.label()}"] = get_tgt_fact(
+                    model_xbrl, is_consolidated, ns, qname_prefix, top_str_for_contextid, mcpt_3rd)
 
     return dict_facts
 
